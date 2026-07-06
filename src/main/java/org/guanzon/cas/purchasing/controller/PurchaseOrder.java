@@ -2103,6 +2103,9 @@ public class PurchaseOrder extends Transaction {
 
         try {
             if (Master().getWithAdvPaym() && Master().getDownPaymentRatesAmount().doubleValue() > PurchaseOrderStaticData.default_value_double) {
+                //Populate PO attachment to PRF
+                poPaymentRequest.PaymentRequest().loadPOAttachment(Master().getTransactionNo());
+
                 poPaymentRequest.PaymentRequest().setWithParent(true);
                 poJSON = poPaymentRequest.PaymentRequest().SaveTransaction();
                 if ("error".equals((String) poJSON.get("result"))) {
