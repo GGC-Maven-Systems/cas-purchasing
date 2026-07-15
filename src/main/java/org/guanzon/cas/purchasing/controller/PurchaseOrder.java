@@ -1994,7 +1994,10 @@ public class PurchaseOrder extends Transaction {
 
         try {
             System.out.println("poJSON = generatePRF()");
-            if (Master().getWithAdvPaym() && Master().getDownPaymentRatesAmount().doubleValue() > PurchaseOrderStaticData.default_value_double) {
+            if (Master().getWithAdvPaym() 
+                    && (Master().getDownPaymentRatesAmount().doubleValue() > PurchaseOrderStaticData.default_value_double 
+                    || Master().getDownPaymentRatesPercentage().doubleValue() > PurchaseOrderStaticData.default_value_double) //Added validation for rate - Arsiela 07-15-2026 ; Original programmer Dave & TJ forgot to update based on the previous instruction as per sir TJ
+                ) {
                 poPaymentRequest = new CashflowControllers(poGRider, null);
 
                 poPaymentRequest.PaymentRequest().InitTransaction();
@@ -2008,22 +2011,28 @@ public class PurchaseOrder extends Transaction {
                     poPaymentRequest.PaymentRequest().Master().setDepartmentID(poGRider.getDepartment());
                 }
 
-                double transactionTotal = Master().getTranTotal().doubleValue();
-                double discountRate = Master().getDiscount().doubleValue();
-                double additionalDiscount = Master().getAdditionalDiscount().doubleValue();
-                double downPaymentPercentage = Master().getDownPaymentRatesPercentage().doubleValue();
-                double downPaymentFixedAmount = Master().getDownPaymentRatesAmount().doubleValue();
+//                double transactionTotal = Master().getTranTotal().doubleValue();
+//                double discountRate = Master().getDiscount().doubleValue();
+//                double additionalDiscount = Master().getAdditionalDiscount().doubleValue();
+//                double downPaymentPercentage = Master().getDownPaymentRatesPercentage().doubleValue();
+//                double downPaymentFixedAmount = Master().getDownPaymentRatesAmount().doubleValue();
+//
+//                double discountAmount = transactionTotal * discountRate;
+//                double netTotal = transactionTotal - discountAmount;
+//
+//                netTotal -= additionalDiscount;
+//
+//                double downPaymentPercentageAmount = netTotal * downPaymentPercentage;
+//                netTotal -= downPaymentPercentageAmount;
+//                netTotal -= downPaymentFixedAmount;
+//
+//                double totalAdv = downPaymentPercentageAmount + downPaymentFixedAmount;
 
-                double discountAmount = transactionTotal * discountRate;
-                double netTotal = transactionTotal - discountAmount;
-
-                netTotal -= additionalDiscount;
-
-                double downPaymentPercentageAmount = netTotal * downPaymentPercentage;
-                netTotal -= downPaymentPercentageAmount;
-                netTotal -= downPaymentFixedAmount;
-
-                double totalAdv = downPaymentPercentageAmount + downPaymentFixedAmount;
+                //Disable computation above and replace by the computation below - Arsiela 07-15-2026
+                Double downPaymentFixedAmount = Master().getDownPaymentRatesAmount().doubleValue();
+                Double downPaymentPercentage = Master().getDownPaymentRatesPercentage().doubleValue();
+                Double downPaymentPercentageAmount = (Master().getNetTotal().doubleValue() / 100) * downPaymentPercentage;
+                Double totalAdv = downPaymentPercentageAmount + downPaymentFixedAmount;
 
                 poPaymentRequest.PaymentRequest().Master().setRemarks(Master().getRemarks());
                 poPaymentRequest.PaymentRequest().Master().setIndustryID(Master().getIndustryID());
@@ -2038,13 +2047,14 @@ public class PurchaseOrder extends Transaction {
                 poPaymentRequest.PaymentRequest().Master().setTransactionStatus(PurchaseOrderStatus.CONFIRMED);
 
                 poPaymentRequest.PaymentRequest().Detail(0).setEntryNo((int) 1);
-                poPaymentRequest.PaymentRequest().Detail(0).setParticularID(PurchaseOrderStaticData.PurchaseOrder);
-                poPaymentRequest.PaymentRequest().Detail(0).setPRFRemarks(PurchaseOrderStaticData.default_empty_string);
+                poPaymentRequest.PaymentRequest().Detail(0).setParticularID(PurchaseOrderStaticData.default_empty_string);
                 poPaymentRequest.PaymentRequest().Detail(0).setAmount(totalAdv);
                 poPaymentRequest.PaymentRequest().Detail(0).setDiscount(PurchaseOrderStaticData.default_value_double);
                 poPaymentRequest.PaymentRequest().Detail(0).setAddDiscount(PurchaseOrderStaticData.default_value_double);
                 poPaymentRequest.PaymentRequest().Detail(0).setVatable(PurchaseOrderStaticData.default_value_string);
                 poPaymentRequest.PaymentRequest().Detail(0).setWithHoldingTax(PurchaseOrderStaticData.default_value_double);
+                poPaymentRequest.PaymentRequest().Detail(0).setPRFRemarks(Master().getRemarks()); //Autoset PO Remarks to PRF - Arsiela 07-15-2026
+                poPaymentRequest.PaymentRequest().Detail(0).isReverse(true); //Added by Arsiela 07-15-2026
                 poPaymentRequest.PaymentRequest().AddDetail();
             }
 
@@ -2102,8 +2112,12 @@ public class PurchaseOrder extends Transaction {
         }
 
         try {
-            if (Master().getWithAdvPaym() && Master().getDownPaymentRatesAmount().doubleValue() > PurchaseOrderStaticData.default_value_double) {
-                //Populate PO attachment to PRF
+            if (Master().getWithAdvPaym() 
+                    && (Master().getDownPaymentRatesAmount().doubleValue() > PurchaseOrderStaticData.default_value_double 
+                    || Master().getDownPaymentRatesPercentage().doubleValue() > PurchaseOrderStaticData.default_value_double) //Added validation for rate - Arsiela 07-15-2026 ; Original programmer Dave & TJ forgot to update based on the previous instruction as per sir TJ
+                ) {
+                
+                //Populate PO attachment to PRF - Arsiela 07-06-2026
                 poPaymentRequest.PaymentRequest().loadPOAttachment(Master().getTransactionNo());
 
                 poPaymentRequest.PaymentRequest().setWithParent(true);
@@ -3315,11 +3329,9 @@ public class PurchaseOrder extends Transaction {
         if (fsValue == null || fsValue.isEmpty()) {
             fsValue = "0.00";
         }
-        double amountAfterDiscounts = Master().getTranTotal().doubleValue() - (((Master().getTranTotal().doubleValue() / 100) * Master().getDiscount().doubleValue())
-                + Master().getAdditionalDiscount().doubleValue());
-
+        double amountAfterDiscounts = Master().getTranTotal().doubleValue() - (((Master().getTranTotal().doubleValue() / 100) * Master().getDiscount().doubleValue()) + Master().getAdditionalDiscount().doubleValue());
         if (amountAfterDiscounts <= PurchaseOrderStaticData.default_value_double) {
-            poJSON.put("message", "Invalid to enter Advance Payment Rate, the total transaction amount is 0.0000");
+            poJSON.put("message", "Invalid Advance Payment Rate, the total transaction amount is 0.0000");
             poJSON.put("result", "error");
             Master().setDownPaymentRatesPercentage(PurchaseOrderStaticData.default_value_double);
             computeNetTotal();
@@ -3330,6 +3342,16 @@ public class PurchaseOrder extends Transaction {
         if (lnAdvanceRate < PurchaseOrderStaticData.default_value_double || lnAdvanceRate > 100.0000) {
             poJSON.put("message", "Invalid Advance Payment Rate. Must be between 0.0000 and 100.0000");
             poJSON.put("result", "error");
+            Master().setDownPaymentRatesPercentage(PurchaseOrderStaticData.default_value_double);
+            computeNetTotal();
+            return poJSON;
+        }
+        
+        //Added validation for total downpayment Arsiela 07-15-2026
+        double ldblTotalAdvPayment = ((amountAfterDiscounts/100) * lnAdvanceRate) + Master().getDownPaymentRatesAmount().doubleValue();
+        if(ldblTotalAdvPayment > amountAfterDiscounts){
+            poJSON.put("result", "error");
+            poJSON.put("message", "Invalid Downpayment Total.");
             Master().setDownPaymentRatesPercentage(PurchaseOrderStaticData.default_value_double);
             computeNetTotal();
             return poJSON;
@@ -3345,7 +3367,6 @@ public class PurchaseOrder extends Transaction {
             computeNetTotal();
             return poJSON;
         }
-
         poJSON.put("result", "success");
         return poJSON;
     }
@@ -3355,23 +3376,34 @@ public class PurchaseOrder extends Transaction {
         if (fsValue == null || fsValue.isEmpty()) {
             fsValue = "0.0000";
         }
-        double totalAmountAfterDiscount = Master().getTranTotal().doubleValue() - ((Master().getTranTotal().doubleValue() * Master().getDiscount().doubleValue())
-                + Master().getAdditionalDiscount().doubleValue());
-        double totalAdvRateAmount = totalAmountAfterDiscount * Master().getDownPaymentRatesPercentage().doubleValue();
-        double totalAmountDiscountWithRate = totalAmountAfterDiscount - totalAdvRateAmount;
+//        double totalAmountAfterDiscount = Master().getTranTotal().doubleValue() - ((Master().getTranTotal().doubleValue() * Master().getDiscount().doubleValue()) + Master().getAdditionalDiscount().doubleValue());
+//        double totalAdvRateAmount = totalAmountAfterDiscount * Master().getDownPaymentRatesPercentage().doubleValue();
+//        double totalAmountDiscountWithRate = totalAmountAfterDiscount - totalAdvRateAmount;
 
-        double lnAdvanceAmount = Double.parseDouble(fsValue.replace(",", ""));
-        if (totalAmountDiscountWithRate <= PurchaseOrderStaticData.default_value_double) {
-            poJSON.put("message", "Invalid to enter Advance Payment Amount, the total transaction amount is 0.0000");
+        //Replace by the computation above Arsiela 07-15-2026
+        double amountAfterDiscounts = Master().getTranTotal().doubleValue() - (((Master().getTranTotal().doubleValue() / 100) * Master().getDiscount().doubleValue()) + Master().getAdditionalDiscount().doubleValue());
+        
+        if (amountAfterDiscounts <= PurchaseOrderStaticData.default_value_double) {
+            poJSON.put("message", "Invalid Advance Payment Amount, the total transaction amount is 0.0000");
             poJSON.put("result", "error");
             Master().setDownPaymentRatesPercentage(PurchaseOrderStaticData.default_value_double);
             computeNetTotal();
             return poJSON;
         }
 
-        if (lnAdvanceAmount < PurchaseOrderStaticData.default_value_double || lnAdvanceAmount > totalAmountDiscountWithRate) {
+        double lnAdvanceAmount = Double.parseDouble(fsValue.replace(",", ""));
+        if (lnAdvanceAmount < PurchaseOrderStaticData.default_value_double || lnAdvanceAmount > amountAfterDiscounts) {
             poJSON.put("message", "Invalid Advance Payment Amount");
             poJSON.put("result", "error");
+            Master().setDownPaymentRatesAmount(PurchaseOrderStaticData.default_value_double);
+            computeNetTotal();
+            return poJSON;
+        }
+        
+        double ldblTotalAdvPayment = ((amountAfterDiscounts/100) * Master().getDownPaymentRatesPercentage().doubleValue()) + lnAdvanceAmount ; //Added validation for total downpayment Arsiela 07-15-2026
+        if(ldblTotalAdvPayment > amountAfterDiscounts){
+            poJSON.put("result", "error");
+            poJSON.put("message", "Invalid Downpayment Total.");
             Master().setDownPaymentRatesAmount(PurchaseOrderStaticData.default_value_double);
             computeNetTotal();
             return poJSON;
