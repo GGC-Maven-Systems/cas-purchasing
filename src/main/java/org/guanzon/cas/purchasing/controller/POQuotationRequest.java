@@ -2986,7 +2986,7 @@ public class POQuotationRequest extends Transaction {
                 lsSQL = lsSQL + " GROUP BY a.sTransNox, c.sSupplier, c.sCompnyID " ;
             }
         }
-        lsSQL = lsSQL + " ORDER BY a.sTransNox, a.dTransact, c.sSupplier, c.sCompnyID, b.nEntryNox ASC ";
+        lsSQL = lsSQL + " ORDER BY a.dTransact, a.sTransNox, c.sSupplier, c.sCompnyID, b.nEntryNox ASC ";
         System.out.println("Executing SQL: " + lsSQL);
         ResultSet loRS = poGRider.executeQuery(lsSQL);
         if (MiscUtil.RecordCount(loRS) <= 0) {
