@@ -1429,6 +1429,72 @@ public class PurchaseOrder extends Transaction {
         return poJSON;
     }
 
+    //Arsiela 08-04-2026
+    public JSONObject POCancelTransaction() throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
+        poJSON = new JSONObject();
+
+        String lsStatus = PurchaseOrderStatus.CANCELLED;
+        
+        try {
+
+            poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), "CancelTransaction", lsStatus, false, true);
+            if (!"success".equals((String) poJSON.get("result"))) {
+                poGRider.rollbackTrans();
+                return poJSON;
+            }
+            
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
+            poJSON.put("message", "Transaction cancelled successfully.");
+        } catch (GuanzonException | SQLException | CloneNotSupportedException ex) {
+            Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+            poJSON.put("result", "error");
+            poJSON.put("message", MiscUtil.getException(ex));
+        }
+        return poJSON;
+    }
+    
+    public JSONObject RevertStatus() throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
+        poJSON = new JSONObject();
+        
+        String lsStatus = getPrevStatus();
+        System.out.println("PREVIOUS STATUS : " + lsStatus);
+        if(lsStatus != null && !"".equals(lsStatus)){
+            try {
+                poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), "RevertStatus", lsStatus, false, true);
+                if (!"success".equals((String) poJSON.get("result"))) {
+                    poGRider.rollbackTrans();
+                    return poJSON;
+                }
+
+                poJSON = new JSONObject();
+                poJSON.put("result", "success");
+                poJSON.put("message", "Transaction status revert successfully.");
+            } catch (GuanzonException | SQLException | CloneNotSupportedException ex) {
+                Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+                poJSON.put("result", "error");
+                poJSON.put("message", MiscUtil.getException(ex));
+            }
+        }
+        return poJSON;
+    }
+    
+    //Check Previous Status
+    public String getPrevStatus() throws SQLException{
+        String lsSQL = " SELECT cRefrStat FROM Transaction_Status_History WHERE sSourceNo = "+SQLUtil.toSQL(Master().getTransactionNo())
+                        + " AND sTableNme = "+SQLUtil.toSQL(Master().getTable())
+                        + " AND cRefrStat != "+SQLUtil.toSQL(Master().getTransactionStatus()) //Not equal to current status
+                        + " ORDER BY sTransNox DESC LIMIT 1  ";
+        System.out.println("SQL : " + lsSQL);
+        ResultSet loRS = this.poGRider.executeQuery(lsSQL);
+        if(loRS != null){
+            if(loRS.next()){
+                return loRS.getString("cRefrStat");
+            }
+        }
+        return "";
+    }
+
     public JSONObject VoidTransaction(String remarks) throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
         poJSON = new JSONObject();
 

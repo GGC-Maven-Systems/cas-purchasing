@@ -437,6 +437,7 @@ public class POCancellation extends Transaction {
 
         poGRider.beginTrans("UPDATE STATUS", "ConfirmTransaction", SOURCE_CODE, getMaster().getTransactionNo());
         try {
+            paPOMaster = new ArrayList<>();
             for (int lnCtr = 0; lnCtr < paDetail.size(); lnCtr++) {
                 Model_PO_Cancellation_Detail loDetail = (Model_PO_Cancellation_Detail) paDetail.get(lnCtr);
 
@@ -444,6 +445,15 @@ public class POCancellation extends Transaction {
                     if (!loDetail.getOrderNo().isEmpty()) {
                         if (loDetail.getStockId() != null) {
                             if (!loDetail.getStockId().isEmpty()) {
+                                //Arsiela 08-04-2026
+                                if(paPOMaster.size() <= 0 || paPOMaster.isEmpty()){
+                                    paPOMaster.add(loDetail.getOrderNo());
+                                } else {
+                                    if(!paPOMaster.contains(loDetail.getOrderNo())){
+                                        paPOMaster.add(loDetail.getOrderNo());
+                                    }
+                                }
+                                
                                 poJSON = new JSONObject();
                                 poJSON = TagPODetail(lnCtr);
 
@@ -455,6 +465,13 @@ public class POCancellation extends Transaction {
                         }
                     }
                 }
+            }
+            
+            //Arsiela 08-04-2026
+            poJSON = updatePurchaseOrder(POCancellationStatus.CONFIRMED);
+            if (!"success".equals((String) poJSON.get("result"))) {
+                poGRider.rollbackTrans();
+                return poJSON;
             }
 
             //kalyptus - 2025.10.10 09:31am
@@ -481,7 +498,7 @@ public class POCancellation extends Transaction {
             if (check != null) {
                 check.postAuth();
             }
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException | CloneNotSupportedException | ParseException ex) {
             Logger.getLogger(PurchaseOrder.class.getName()).log(Level.SEVERE, null, ex);
 
             poJSON.put("result", "error");
@@ -499,7 +516,78 @@ public class POCancellation extends Transaction {
 
         return poJSON;
     }
+    
+    private List<String> paPOMaster = new ArrayList<>(); //Arsiela 08-04-2026
+    private JSONObject updatePurchaseOrder(String fsStatus) throws CloneNotSupportedException, SQLException, GuanzonException, ParseException{
+        //Check PO Cancellation Detail: Added Purchase Order cancel when all PO Detail was cancelled; Arsiela 08-04-2026
+        boolean lbIsAllCancelled = true;
+        for(int lnCtr = 0; lnCtr < paPOMaster.size(); lnCtr++){
+            if(paPOMaster.get(lnCtr) != null && !"".equals(paPOMaster.get(lnCtr))){
+                PurchaseOrder loObject = new PurchaseOrderControllers(poGRider, logwrapr).PurchaseOrder();
+                loObject.InitTransaction();
+                poJSON = loObject.OpenTransaction(paPOMaster.get(lnCtr));
+                if (!"success".equals((String) poJSON.get("result"))) {
+                    poGRider.rollbackTrans();
+                    return poJSON;
+                }
+                
+                if(POCancellationStatus.CONFIRMED.equals(fsStatus)){
+                    for(int lnRow = 0; lnRow < loObject.getDetailCount();lnRow++ ){ //Check Purchase Order Detail
+                        boolean lbBreak = false;
+                        boolean lbExist = false;
+                        for (int lnCnt = 0; lnCnt < paDetail.size(); lnCnt++) { //Check PO Cancellation Detail
+                            Model_PO_Cancellation_Detail loDetail = (Model_PO_Cancellation_Detail) paDetail.get(lnCnt);
+                            if (loDetail.getOrderNo() != null) {
+                                if (!loDetail.getOrderNo().isEmpty() && loDetail.getOrderNo().equals(paPOMaster.get(lnCtr))) {
+                                    if (loDetail.getStockId() != null) {
+                                        if (!loDetail.getStockId().isEmpty() && loDetail.getStockId().equals(loObject.Detail(lnRow).getStockID())) {
+                                            lbExist = true;
+                                            double ldblCancelQty = loObject.Detail(lnRow).getCancelledQuantity().doubleValue(); //loDetail.getQuantity() + 
+                                            lbIsAllCancelled = (ldblCancelQty == loObject.Detail(lnRow).getQuantity().doubleValue());
+                                            if(!lbIsAllCancelled){
+                                                lbBreak = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
+                        if(!lbBreak){
+                            break;
+                        }
+
+                        if(!lbExist){
+                            lbIsAllCancelled = (loObject.Detail(lnRow).getCancelledQuantity().doubleValue() == loObject.Detail(lnRow).getQuantity().doubleValue());
+                            if(!lbIsAllCancelled){
+                                break;
+                            }
+                        }
+                    }
+
+                    if(lbIsAllCancelled){
+                        poJSON = loObject.POCancelTransaction();
+                        if (!"success".equals((String) poJSON.get("result"))) {
+                            poGRider.rollbackTrans();
+                            return poJSON;
+                        }
+                    }
+                } else if(POCancellationStatus.CANCELLED.equals(fsStatus)){
+                    poJSON = loObject.RevertStatus();
+                    if (!"success".equals((String) poJSON.get("result"))) {
+                        poGRider.rollbackTrans();
+                        return poJSON;
+                    }
+                }
+            }
+        }
+        
+        poJSON = new JSONObject();
+        poJSON.put("result", "success");
+        return poJSON;
+    }
+    
     public JSONObject TagPODetail(int EntryNo) throws SQLException, GuanzonException {
         poJSON = new JSONObject();
         Model_PO_Cancellation_Detail loDetail = (Model_PO_Cancellation_Detail) paDetail.get(EntryNo);
@@ -761,6 +849,43 @@ public class POCancellation extends Transaction {
         }
 
         poGRider.beginTrans("UPDATE STATUS", "CancelTransaction", SOURCE_CODE, getMaster().getTransactionNo());
+        
+        //Added by Arsiela 08-04-2026
+        paPOMaster = new ArrayList<>();
+        for (int lnCtr = 0; lnCtr < paDetail.size(); lnCtr++) {
+            Model_PO_Cancellation_Detail loDetail = (Model_PO_Cancellation_Detail) paDetail.get(lnCtr);
+
+            if (loDetail.getOrderNo() != null) {
+                if (!loDetail.getOrderNo().isEmpty()) {
+                    if (loDetail.getStockId() != null) {
+                        if (!loDetail.getStockId().isEmpty()) {
+                            if(paPOMaster.size() <= 0 || paPOMaster.isEmpty()){
+                                paPOMaster.add(loDetail.getOrderNo());
+                            } else {
+                                if(!paPOMaster.contains(loDetail.getOrderNo())){
+                                    paPOMaster.add(loDetail.getOrderNo());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        try {
+            //Arsiela 08-04-2026
+            poJSON = updatePurchaseOrder(POCancellationStatus.CANCELLED);
+            if (!"success".equals((String) poJSON.get("result"))) {
+                poGRider.rollbackTrans();
+                return poJSON;
+            }
+        } catch (ParseException ex) {
+            Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+            poJSON.put("result", "error");
+            poJSON.put("message", MiscUtil.getException(ex));
+            poGRider.rollbackTrans();
+            return poJSON;
+        }
 
         //kalyptus - 2025.10.10 09:31am
         //Update the inventory for this Cancelled Purchase
