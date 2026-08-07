@@ -389,6 +389,15 @@ public class PurchaseOrder extends Transaction {
             Master().setTransactionNo(Master().getNextCode());
 
         }
+        
+        //Require Attachment if transaction total is greater than 100,000.0000 Arsiela 08-07-2026 04:44PM Requested by sir Mac
+        if(Master().getTranTotal().doubleValue() > 100000.0000){
+            if(getTransactionAttachmentCount() <= 0){
+                poJSON.put("result", "error");
+                poJSON.put("message", "Transaction attachment cannot be empty.");
+                return poJSON;
+            }
+        }
 
         if (poGRider.getDepartment().equals(allowedDepartment)) {
             if (Master().getTransactionStatus().equals(PurchaseOrderStatus.OPEN)
