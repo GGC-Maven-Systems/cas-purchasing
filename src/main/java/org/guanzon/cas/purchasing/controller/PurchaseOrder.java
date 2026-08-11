@@ -30,16 +30,8 @@ import java.util.logging.Logger;
 import javafx.application.Platform;
 import javax.sql.rowset.CachedRowSet;
 import javax.swing.*;
-import javax.swing.filechooser.FileNameExtensionFilter;
-
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
-import net.sf.jasperreports.engine.export.HtmlExporter;
-import net.sf.jasperreports.engine.export.JRCsvExporter;
-import net.sf.jasperreports.engine.export.ooxml.JRDocxExporter;
-import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
-import net.sf.jasperreports.engine.xml.JRXmlWriter;
-import net.sf.jasperreports.export.*;
 import net.sf.jasperreports.swing.JRViewer;
 import net.sf.jasperreports.swing.JRViewerToolbar;
 import net.sf.jasperreports.view.JasperViewer;
@@ -65,13 +57,10 @@ import org.guanzon.appdriver.constant.UserRight;
 import org.guanzon.appdriver.iface.GValidator;
 import org.guanzon.appdriver.token.RequestAccess;
 import org.guanzon.cas.client.account.AP_Client_Master;
-import org.guanzon.cas.client.model.Model_Client_Master;
 import org.guanzon.cas.client.services.ClientControllers;
-import org.guanzon.cas.client.services.ClientModels;
 import org.guanzon.cas.inv.InvTransCons;
 import org.guanzon.cas.inv.Inventory;
 import org.guanzon.cas.inv.InventoryTransaction;
-//import org.guanzon.cas.inv.Inventory;
 import org.guanzon.cas.inv.services.InvControllers;
 import org.guanzon.cas.inv.warehouse.StockRequest;
 import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Master;
@@ -92,19 +81,18 @@ import org.guanzon.cas.purchasing.model.Model_PO_Detail;
 import org.guanzon.cas.purchasing.model.Model_PO_Master;
 import org.guanzon.cas.purchasing.services.PurchaseOrderControllers;
 import org.guanzon.cas.purchasing.services.PurchaseOrderModels;
+import org.guanzon.cas.purchasing.services.QuotationControllers;
+import org.guanzon.cas.purchasing.status.POQuotationStatus;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStaticData;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
 import org.guanzon.cas.purchasing.utility.CustomJasperViewerReports;
 import org.guanzon.cas.purchasing.validator.PurchaseOrderValidatorFactory;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import ph.com.guanzongroup.cas.cashflow.DisbursementVoucher;
 import ph.com.guanzongroup.cas.cashflow.Payee;
 import ph.com.guanzongroup.cas.cashflow.services.CashflowControllers;
-import org.guanzon.cas.purchasing.services.QuotationControllers;
-import org.guanzon.cas.purchasing.status.POQuotationStatus;
-import org.json.simple.parser.JSONParser;
 
 public class PurchaseOrder extends Transaction {
 
@@ -3325,7 +3313,7 @@ public class PurchaseOrder extends Transaction {
         if (fsValue == null || fsValue.isEmpty()) {
             fsValue = "0.0000";
         }
-        double lnTotalAmount = (double) Master().getTranTotal();
+        double lnTotalAmount = Master().getTranTotal().doubleValue();
         if (lnTotalAmount == 0.0000) {
             poJSON.put("message", "You're not allowed to enter discount rate, no detail amount entered.");
             poJSON.put("result", "error");
