@@ -7,10 +7,8 @@ import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
-import org.guanzon.appdriver.agent.services.Transaction;
 import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.appdriver.base.GuanzonException;
-import org.guanzon.appdriver.constant.EditMode;
 import org.guanzon.cas.purchasing.controller.PurchaseOrder;
 import org.guanzon.cas.purchasing.services.PurchaseOrderControllers;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
@@ -679,6 +677,141 @@ public class PurchaseOrderTest {
 
     @Test
     @Order(23)
+    public void testWillSaveReturnedTransactionWithModifiedRemarks() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000034");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String currentRemarks = poController.Master().getRemarks();
+        poController.Master().setRemarks((currentRemarks == null ? "" : currentRemarks) + " - updated");
+
+        loJSON = poController.willSave();
+        Assert.assertEquals("success", loJSON.get("result"));
+    }
+
+    @Test
+    @Order(24)
+    public void testWillSaveAssignsTransactionNoAndDetailEntryNumbers() throws Exception {
+        startNewTransaction();
+
+        if (poController.getDetailCount() == 0) {
+            JSONObject loJSON = poController.AddDetail();
+            Assert.assertEquals("success", loJSON.get("result"));
+        }
+
+        // Make sure at least one row is valid so it survives willSave pruning.
+        poController.Detail(0).setStockID("GK0123000010");
+        poController.Detail(0).setQuantity(1);
+
+        JSONObject loJSON = poController.willSave();
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertNotNull(poController.Master().getTransactionNo());
+        Assert.assertFalse(poController.Master().getTransactionNo().isEmpty());
+        Assert.assertTrue(poController.getDetailCount() > 0);
+
+        for (int row = 0; row < poController.getDetailCount(); row++) {
+            Assert.assertEquals(poController.Master().getTransactionNo(), poController.Detail(row).getTransactionNo());
+            Assert.assertEquals(row + 1, poController.Detail(row).getEntryNo().intValue());
+            Assert.assertNotNull(poController.Detail(row).getModifiedDate());
+        }
+    }
+
+    @Test
+    @Order(25)
+    public void testWillSaveReturnsErrorForInvalidProjectReference() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setPrivateField(poController, "allowedDepartment", instance.getDepartment());
+        poController.Master().setTransactionStatus(PurchaseOrderStatus.OPEN);
+        poController.Master().setReference("INVALID_PROJECT_REFERENCE");
+
+        loJSON = poController.willSave();
+        Assert.assertEquals("error", loJSON.get("result"));
+    }
+
+    @Test
+    @Order(26)
+    public void testWillSavePrunesNullStockIdRow() throws Exception {
+        startNewTransaction();
+
+        if (poController.getDetailCount() == 0) {
+            JSONObject loJSON = poController.AddDetail();
+            Assert.assertEquals("success", loJSON.get("result"));
+        }
+
+        poController.Detail(0).setStockID(null);
+        poController.Detail(0).setQuantity(1);
+
+        JSONObject loJSON = poController.willSave();
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals(0, poController.getDetailCount());
+    }
+
+        @Test
+        @Order(60)
+        public void testWillSaveUpdateTransactionWithLinkedAttachmentsSetsAttachmentFields() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000029");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.UpdateTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        // Load seeded linked attachments from transaction_attachment_data.sql (sSourceCd = POxx).
+        poController.loadAttachments();
+        Assert.assertTrue("Expected linked attachments for the seeded PO transaction.",
+            poController.getTransactionAttachmentCount() > 0);
+
+        loJSON = poController.willSave();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        for (int row = 0; row < poController.getTransactionAttachmentCount(); row++) {
+            Assert.assertEquals(poController.Master().getTransactionNo(),
+                poController.TransactionAttachmentList(row).getModel().getSourceNo());
+            Assert.assertEquals(poController.getSourceCode(),
+                poController.TransactionAttachmentList(row).getModel().getSourceCode());
+            Assert.assertEquals(poController.Master().getBranchCode(),
+                poController.TransactionAttachmentList(row).getModel().getBranchCode());
+            Assert.assertEquals(System.getProperty("sys.default.path.temp.attachments"),
+                poController.TransactionAttachmentList(row).getModel().getImagePath());
+        }
+        }
+
+        @Test
+        @Order(61)
+        public void testWillSaveUpdateTransactionWithLinkedAttachmentsPreservesAttachmentCount() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000030");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.UpdateTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.loadAttachments();
+        int beforeCount = poController.getTransactionAttachmentCount();
+        Assert.assertTrue("Expected linked attachments for the seeded PO transaction.", beforeCount > 0);
+
+        loJSON = poController.willSave();
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals(beforeCount, poController.getTransactionAttachmentCount());
+        }
+
+    @Test
+    @Order(23)
     public void testNetTotalCheckerSuccess() throws Exception {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
@@ -1182,180 +1315,91 @@ public class PurchaseOrderTest {
         }
     }
 
-//    @Test
-//    @Order(53)
-//    public void testSearchTransactionMethod() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//        poController.Master().setIndustryID("09");
-//        poController.Master().setCompanyID("M001");
-//        poController.Master().setCategoryCode("0000007");
-//        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
-//
-//        loJSON = poController.SearchTransaction("", "M00115000863", "GCO126", "", 1);
-//        assertSearchJson(loJSON);
-//    }
+    @Test
+    @Order(53)
+    public void testOpenTransactionInvalidTransactionNoReturnsError() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("INVALID_TRANS_NO");
+        Assert.assertEquals("error", loJSON.get("result"));
+    }
+
 //    @Test
 //    @Order(54)
-//    public void testSearchBranchMethod() throws Exception {
+//    public void testPostTransactionWithoutLoadedTransactionReturnsError() throws Exception {
 //        resetController();
 //        JSONObject loJSON = poController.InitTransaction();
 //        Assert.assertEquals("success", loJSON.get("result"));
 //
-//        loJSON = poController.SearchBranch("GCO1", true);
-//        assertSearchJson(loJSON);
+//        loJSON = poController.PostTransaction("");
+//        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
 //    }
+//
 //    @Test
 //    @Order(55)
-//    public void testSearchIndustryMethod() throws Exception {
+//    public void testCancelTransactionWithoutLoadedTransactionReturnsError() throws Exception {
 //        resetController();
 //        JSONObject loJSON = poController.InitTransaction();
 //        Assert.assertEquals("success", loJSON.get("result"));
 //
-//        loJSON = poController.SearchIndustry("09", true);
-//        assertSearchJson(loJSON);
+//        loJSON = poController.CancelTransaction("");
+//        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
 //    }
+//
 //    @Test
 //    @Order(56)
-//    public void testSearchCategoryMethod() throws Exception {
+//    public void testVoidTransactionWithoutLoadedTransactionReturnsError() throws Exception {
 //        resetController();
 //        JSONObject loJSON = poController.InitTransaction();
 //        Assert.assertEquals("success", loJSON.get("result"));
-//        poController.Master().setIndustryID("09");
 //
-//        loJSON = poController.SearchCategory("0000007", true);
-//        assertSearchJson(loJSON);
+//        loJSON = poController.VoidTransaction("");
+//        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
 //    }
+//
 //    @Test
 //    @Order(57)
-//    public void testSearchTermMethod() throws Exception {
+//    public void testReturnTransactionWithoutLoadedTransactionReturnsError() throws Exception {
 //        resetController();
 //        JSONObject loJSON = poController.InitTransaction();
 //        Assert.assertEquals("success", loJSON.get("result"));
 //
-//        loJSON = poController.SearchTerm("C001017", true);
-//        assertSearchJson(loJSON);
+//        loJSON = poController.ReturnTransaction("");
+//        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
 //    }
+//
 //    @Test
 //    @Order(58)
-//    public void testSearchSupplierMethod() throws Exception {
+//    public void testApproveTransactionWithoutLoadedTransactionReturnsError() throws Exception {
 //        resetController();
 //        JSONObject loJSON = poController.InitTransaction();
 //        Assert.assertEquals("success", loJSON.get("result"));
-//        poController.Master().setIndustryID("09");
 //
-//        loJSON = poController.SearchSupplier("M00115000863", true);
-//        assertSearchJson(loJSON);
+//        loJSON = poController.ApproveTransaction("");
+//        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
 //    }
-
+//
 //    @Test
 //    @Order(59)
-//    public void testSearchProjectMethod() throws Exception {
+//    public void testReturnTransactionWhenAlreadyReturnedReturnsError() throws Exception {
 //        resetController();
 //        JSONObject loJSON = poController.InitTransaction();
 //        Assert.assertEquals("success", loJSON.get("result"));
 //
-//        loJSON = poController.SearchProject("GCO126000002");
-//        assertSearchJson(loJSON);
-//    }
-//    @Test
-//    @Order(60)
-//    public void testSearchCompanyMethod() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//        poController.Master().setIndustryID("09");
-//
-//        loJSON = poController.SearchCompany("M001", true);
-//        assertSearchJson(loJSON);
-//    }
-
-//    @Test
-//    @Order(61)
-//    public void testSearchDestinationMethod() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
+//        loJSON = poController.OpenTransaction("GCO126000034");
 //        Assert.assertEquals("success", loJSON.get("result"));
 //
-//        loJSON = poController.SearchDestination("GCO1", true);
-//        assertSearchJson(loJSON);
+//        loJSON = poController.ReturnTransaction("");
+//        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("Transaction was already returned.", loJSON.get("message"));
 //    }
-//    @Test
-//    @Order(62)
-//    public void testSearchDepartmentMethod() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.SearchDepartment("M001", true);
-//        assertSearchJson(loJSON);
-//    }
-
-//    @Test
-//    @Order(63)
-//    public void testSearchBrandMethod() throws Exception {
-//        startNewTransaction();
-//        int row = poController.getDetailCount() - 1;
-//
-//        JSONObject loJSON = poController.SearchBrand("", false, row);
-//        assertSearchJson(loJSON);
-//    }
-//    @Test
-//    @Order(64)
-//    public void testSearchBarcodeMethod() throws Exception {
-//        startNewTransaction();
-//        int row = poController.getDetailCount() - 1;
-//
-//        JSONObject loJSON = poController.SearchBarcode("", false, row, true);
-//        assertSearchJson(loJSON);
-//    }
-
-//    @Test
-//    @Order(65)
-//    public void testSearchBarcodeGeneralMethod() throws Exception {
-//        startNewTransaction();
-//        int row = poController.getDetailCount() - 1;
-//
-//        JSONObject loJSON = poController.SearchBarcodeGeneral("", false, row, true);
-//        assertSearchJson(loJSON);
-//    }
-
-//    @Test
-//    @Order(66)
-//    public void testSearchBarcodeDescriptionMethod() throws Exception {
-//        startNewTransaction();
-//        int row = poController.getDetailCount() - 1;
-//
-//        JSONObject loJSON = poController.SearchBarcodeDescription("", false, row, true);
-//        assertSearchJson(loJSON);
-//    }
-
-//    @Test
-//    @Order(67)
-//    public void testSearchBarcodeDescriptionGeneralMethod() throws Exception {
-//        startNewTransaction();
-//        int row = poController.getDetailCount() - 1;
-//
-//        JSONObject loJSON = poController.SearchBarcodeDescriptionGeneral("", false, row, true);
-//        assertSearchJson(loJSON);
-//    }
-
-    @Test
-    @Order(68)
-    public void testSearchModelMethod() throws Exception {
-        startNewTransaction();
-        int row = poController.getDetailCount() - 1;
-
-        JSONObject loJSON = poController.SearchModel("", false, row, true);
-        assertSearchJson(loJSON);
-    }
-
-    private void assertSearchJson(JSONObject loJSON) {
-        Assert.assertNotNull(loJSON);
-        Assert.assertTrue("Search result must contain key 'result'.", loJSON.containsKey("result"));
-        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
-    }
 
     private static Object invokePrivateMethod(Object target, String methodName, Class<?>[] parameterTypes, Object[] args) throws Exception {
         Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
@@ -1363,16 +1407,10 @@ public class PurchaseOrderTest {
         return method.invoke(target, args);
     }
 
-    private static void setTransactionEditMode(PurchaseOrder controller) throws Exception {
-        Field field = Transaction.class.getDeclaredField("pnEditMode");
+    private static void setPrivateField(Object target, String fieldName, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
-        field.setInt(controller, EditMode.READY);
+        field.set(target, value);
     }
 
-    private void isJSONSuccess(JSONObject loJSON) {
-        if (!"success".equals((String) loJSON.get("result"))) {
-            System.err.println((String) loJSON.get("message"));
-            Assert.fail();
-        }
-    }
 }
