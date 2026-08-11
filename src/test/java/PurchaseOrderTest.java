@@ -4,11 +4,17 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Properties;
 import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.appdriver.base.GuanzonException;
+import org.guanzon.appdriver.constant.RecordStatus;
 import org.guanzon.cas.purchasing.controller.PurchaseOrder;
 import org.guanzon.cas.purchasing.services.PurchaseOrderControllers;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
@@ -810,6 +816,438 @@ public class PurchaseOrderTest {
         Assert.assertEquals(beforeCount, poController.getTransactionAttachmentCount());
         }
 
+        @Test
+        @Order(62)
+        public void testWillSaveAddNewTransactionWithInsertedAttachmentRunsAttachmentLines() throws Exception {
+        startNewTransaction();
+
+        if (poController.getDetailCount() == 0) {
+            JSONObject loJSON = poController.AddDetail();
+            Assert.assertEquals("success", loJSON.get("result"));
+        }
+
+        // Keep at least one valid detail row so willSave reaches the attachment section.
+        poController.Detail(0).setStockID("GK0123000010");
+        poController.Detail(0).setQuantity(1);
+
+        poController.resetattachment();
+        JSONObject loJSON = poController.addAttachment();
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+
+        int attachmentRow = poController.getTransactionAttachmentCount() - 1;
+        String sampleFileName = "Picture1.png";
+
+        // Insert a physical sample file in temp attachment path so copy/attachment lines can execute in ADDNEW mode.
+        Path attachmentDir = Paths.get(System.getProperty("sys.default.path.temp.attachments"));
+        Files.createDirectories(attachmentDir);
+        Files.write(attachmentDir.resolve(sampleFileName), "sample-attachment".getBytes(StandardCharsets.UTF_8));
+
+        poController.TransactionAttachmentList(attachmentRow).getModel().setFileName(sampleFileName);
+        poController.TransactionAttachmentList(attachmentRow).getModel().setSendStatus("1");
+
+        loJSON = poController.willSave();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        Assert.assertEquals(poController.Master().getTransactionNo(),
+            poController.TransactionAttachmentList(attachmentRow).getModel().getSourceNo());
+        Assert.assertEquals(poController.getSourceCode(),
+            poController.TransactionAttachmentList(attachmentRow).getModel().getSourceCode());
+        Assert.assertEquals(poController.Master().getBranchCode(),
+            poController.TransactionAttachmentList(attachmentRow).getModel().getBranchCode());
+        Assert.assertEquals(System.getProperty("sys.default.path.temp.attachments"),
+            poController.TransactionAttachmentList(attachmentRow).getModel().getImagePath());
+        Assert.assertNotNull(poController.TransactionAttachmentList(attachmentRow).getModel().getFileName());
+        Assert.assertFalse(poController.TransactionAttachmentList(attachmentRow).getModel().getFileName().isEmpty());
+        }
+
+    @Test
+    @Order(63)
+    public void testWillSaveAddNewAttachmentSendStatusZeroMissingFileReturnsError() throws Exception {
+        startNewTransaction();
+
+        if (poController.getDetailCount() == 0) {
+            JSONObject loJSON = poController.AddDetail();
+            Assert.assertEquals("success", loJSON.get("result"));
+        }
+
+        poController.Detail(0).setStockID("GK0123000010");
+        poController.Detail(0).setQuantity(1);
+
+        poController.resetattachment();
+        JSONObject loJSON = poController.addAttachment();
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+
+        int attachmentRow = poController.getTransactionAttachmentCount() - 1;
+        String missingFileName = "missing-upload-" + System.nanoTime() + ".png";
+
+        poController.TransactionAttachmentList(attachmentRow).getModel().setFileName(missingFileName);
+        poController.TransactionAttachmentList(attachmentRow).getModel().setSendStatus("0");
+
+        loJSON = poController.willSave();
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("Cannot locate file"));
+    }
+
+    @Test
+    @Order(64)
+    public void testWillSaveAddNewAttachmentCollisionRenamesFileWithoutExtension() throws Exception {
+        startNewTransaction();
+
+        if (poController.getDetailCount() == 0) {
+            JSONObject loJSON = poController.AddDetail();
+            Assert.assertEquals("success", loJSON.get("result"));
+        }
+
+        poController.Detail(0).setStockID("GK0123000010");
+        poController.Detail(0).setQuantity(1);
+
+        poController.resetattachment();
+        JSONObject loJSON = poController.addAttachment();
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+
+        int attachmentRow = poController.getTransactionAttachmentCount() - 1;
+        String baseFileName = "NoExtCollision" + System.nanoTime();
+
+        // Seed DB with same file name so willSave goes through the no-extension rename branch.
+        seedAttachmentFileName(baseFileName);
+
+        Path attachmentDir = Paths.get(System.getProperty("sys.default.path.temp.attachments"));
+        Files.createDirectories(attachmentDir);
+        Files.write(attachmentDir.resolve(baseFileName), "sample-attachment".getBytes(StandardCharsets.UTF_8));
+
+        poController.TransactionAttachmentList(attachmentRow).getModel().setFileName(baseFileName);
+        poController.TransactionAttachmentList(attachmentRow).getModel().setSendStatus("1");
+
+        loJSON = poController.willSave();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String renamedFile = poController.TransactionAttachmentList(attachmentRow).getModel().getFileName();
+        Assert.assertNotEquals(baseFileName, renamedFile);
+        Assert.assertTrue(renamedFile.startsWith(baseFileName + "_"));
+        Assert.assertTrue(Files.exists(attachmentDir.resolve(renamedFile)));
+    }
+
+    @Test
+    @Order(65)
+    public void testAddAttachmentReturnsErrorWhenLastRowNotYetAssigned() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.resetattachment();
+        loJSON = poController.addAttachment();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        // Force the "last row not yet assigned" branch in addAttachment().
+        poController.TransactionAttachmentList(poController.getTransactionAttachmentCount() - 1)
+                .getModel().setTransactionNo("");
+
+        loJSON = poController.addAttachment();
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("Unable to add transaction attachment.", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(66)
+    public void testRemoveAttachmentReturnsErrorWhenListIsEmpty() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.resetattachment();
+        loJSON = poController.removeAttachment(0);
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("No transaction attachment to be removed.", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(67)
+    public void testRemoveAttachmentAddNewRowPhysicallyRemovesItem() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.resetattachment();
+        loJSON = poController.addAttachment();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        int beforeCount = poController.getTransactionAttachmentCount();
+        loJSON = poController.removeAttachment(0);
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals(beforeCount - 1, poController.getTransactionAttachmentCount());
+    }
+
+    @Test
+    @Order(68)
+    public void testRemoveAttachmentLoadedRowMarksInactive() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000029");
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.UpdateTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.loadAttachments();
+        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+
+        int beforeCount = poController.getTransactionAttachmentCount();
+        loJSON = poController.removeAttachment(0);
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals(beforeCount, poController.getTransactionAttachmentCount());
+        Assert.assertEquals(RecordStatus.INACTIVE, poController.TransactionAttachmentList(0).getModel().getRecordStatus());
+    }
+
+    @Test
+    @Order(69)
+    public void testAddAttachmentByFileNameReactivatesInactiveRow() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000029");
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.UpdateTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.loadAttachments();
+        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+
+        String existingFileName = poController.TransactionAttachmentList(0).getModel().getFileName();
+        int beforeCount = poController.getTransactionAttachmentCount();
+
+        loJSON = poController.removeAttachment(0);
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals(RecordStatus.INACTIVE, poController.TransactionAttachmentList(0).getModel().getRecordStatus());
+
+        int row = poController.addAttachment(existingFileName);
+        Assert.assertEquals(0, row);
+        Assert.assertEquals(beforeCount, poController.getTransactionAttachmentCount());
+        Assert.assertEquals(RecordStatus.ACTIVE, poController.TransactionAttachmentList(0).getModel().getRecordStatus());
+    }
+
+    @Test
+    @Order(70)
+    public void testCheckExistingFileNameReturnsErrorForDuplicate() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.checkExistingFileName("Picture1.png");
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("already exist"));
+    }
+
+    @Test
+    @Order(71)
+    public void testCheckExistingFileNameReturnsNonErrorForUniqueName() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.checkExistingFileName("not_in_db_" + System.nanoTime() + ".png");
+        Assert.assertNotEquals("error", loJSON.get("result"));
+    }
+
+    @Test
+    @Order(72)
+    public void testWillSaveAddNewAttachmentCollisionRenamesFileWithExtension() throws Exception {
+        startNewTransaction();
+
+        if (poController.getDetailCount() == 0) {
+            JSONObject loJSON = poController.AddDetail();
+            Assert.assertEquals("success", loJSON.get("result"));
+        }
+
+        poController.Detail(0).setStockID("GK0123000010");
+        poController.Detail(0).setQuantity(1);
+
+        poController.resetattachment();
+        JSONObject loJSON = poController.addAttachment();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        int attachmentRow = poController.getTransactionAttachmentCount() - 1;
+        String baseFileName = "Picture1.png";
+        Path attachmentDir = Paths.get(System.getProperty("sys.default.path.temp.attachments"));
+        Files.createDirectories(attachmentDir);
+        Files.write(attachmentDir.resolve(baseFileName), "sample-attachment".getBytes(StandardCharsets.UTF_8));
+
+        poController.TransactionAttachmentList(attachmentRow).getModel().setFileName(baseFileName);
+        poController.TransactionAttachmentList(attachmentRow).getModel().setSendStatus("1");
+
+        loJSON = poController.willSave();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String renamedFile = poController.TransactionAttachmentList(attachmentRow).getModel().getFileName();
+        Assert.assertNotEquals(baseFileName, renamedFile);
+        Assert.assertTrue(renamedFile.matches("Picture1_\\d+\\.png"));
+        Assert.assertTrue(Files.exists(attachmentDir.resolve(renamedFile)));
+    }
+
+    @Test
+    @Order(73)
+    public void testLoadAttachmentsWithNoPOxxRowsKeepsListEmpty() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        // Use a guaranteed non-existent transaction number to keep attachment query empty.
+        poController.Master().setTransactionNo("NOATTACH00001");
+
+        poController.loadAttachments();
+        Assert.assertEquals(0, poController.getTransactionAttachmentCount());
+    }
+
+    @Test
+    @Order(74)
+    public void testCopyFileWithMissingSourceDoesNotCreateTarget() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String fileName = "copy-missing-" + System.nanoTime() + ".tmp";
+        Path target = Paths.get(System.getProperty("sys.default.path.temp.attachments"), fileName);
+        Files.deleteIfExists(target);
+
+        poController.copyFile(Paths.get(System.getProperty("sys.default.path.temp.attachments"), fileName).toString());
+        Assert.assertFalse(Files.exists(target));
+    }
+
+    @Test
+    @Order(75)
+    public void testCopyFileCopiesToAttachmentTempPath() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String fileName = "copy-success-" + System.nanoTime() + ".tmp";
+        Path sourceDir = Paths.get(System.getProperty("sys.default.path.temp"));
+        Files.createDirectories(sourceDir);
+        Path source = sourceDir.resolve(fileName);
+        Files.write(source, "copy-file-content".getBytes(StandardCharsets.UTF_8));
+
+        Path target = Paths.get(System.getProperty("sys.default.path.temp.attachments"), fileName);
+        Files.deleteIfExists(target);
+
+        poController.copyFile(source.toString());
+        Assert.assertTrue(Files.exists(target));
+    }
+
+    @Test
+    @Order(76)
+    public void testUploadCASAttachmentsReturnsErrorWhenNewAndOriginalFilesMissing() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.resetattachment();
+        loJSON = poController.addAttachment();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        int row = poController.getTransactionAttachmentCount() - 1;
+        poController.TransactionAttachmentList(row).getModel().setImagePath(System.getProperty("sys.default.path.temp.attachments"));
+        poController.TransactionAttachmentList(row).getModel().setFileName("missing-new-" + System.nanoTime() + ".png");
+
+        loJSON = poController.uploadCASAttachments(instance, System.getProperty("sys.default.access.token"), row,
+                "missing-original-" + System.nanoTime() + ".png");
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("Cannot locate file"));
+    }
+
+    @Test
+    @Order(77)
+    public void testSetDiscountRateNegativeValueReturnsError() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.setDiscountRate("-1");
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("Invalid Discount Rate.  Must be between 0.00 and 100.00", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(78)
+    public void testSetDiscountAmountGreaterThanAllowedAmountReturnsError() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        double amountAfterDiscounts = computeAmountAfterDiscounts();
+        loJSON = poController.setDiscountAmount(String.valueOf(amountAfterDiscounts + 1.0));
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("Invalid Discount Amount", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(79)
+    public void testSetAdvancePaymentRateNegativeValueReturnsError() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.setAdvancePaymentRate("-1");
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("Invalid Advance Payment Rate. Must be between 0.0000 and 100.0000", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(80)
+    public void testSetAdvancePaymentRateInvalidDownpaymentTotalReturnsError() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        double amountAfterDiscounts = computeAmountAfterDiscounts();
+
+        loJSON = poController.setAdvancePaymentRate("0");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.setAdvancePaymentAmount(String.valueOf(amountAfterDiscounts));
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.setAdvancePaymentRate("1");
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("Invalid Downpayment Total.", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(81)
+    public void testSetAdvancePaymentAmountInvalidDownpaymentTotalReturnsError() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.setAdvancePaymentAmount("0");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.setAdvancePaymentRate("100");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.setAdvancePaymentAmount("1");
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("Invalid Downpayment Total.", loJSON.get("message"));
+    }
+
     @Test
     @Order(23)
     public void testNetTotalCheckerSuccess() throws Exception {
@@ -1405,6 +1843,26 @@ public class PurchaseOrderTest {
         Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
         return method.invoke(target, args);
+    }
+
+    private static void seedAttachmentFileName(String fileName) throws SQLException {
+        String sql = "INSERT INTO transaction_attachment (sTransNox, sSourceCd, sSourceNo, sFileName) VALUES (?, ?, ?, ?)";
+        String transNo = ("AT" + System.nanoTime()).substring(0, 14);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, transNo);
+            pstmt.setString(2, "POxx");
+            pstmt.setString(3, "GCO126000003");
+            pstmt.setString(4, fileName);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private static double computeAmountAfterDiscounts() {
+        return poController.Master().getTranTotal().doubleValue()
+                - (((poController.Master().getTranTotal().doubleValue() / 100)
+                * poController.Master().getDiscount().doubleValue())
+                + poController.Master().getAdditionalDiscount().doubleValue());
     }
 
     private static void setPrivateField(Object target, String fieldName, Object value) throws Exception {
