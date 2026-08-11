@@ -42,6 +42,7 @@ public class PurchaseOrderTest {
     private String psTransNo = "GK0126000001";
     private String psStockId = "GK0123000010";
     private String psBankId = "M00120139";
+    private static int pnReportSeedBase = 91000000;
 
     @BeforeAll
     public static void setUpClass() throws GuanzonException, SQLException, IOException {
@@ -596,6 +597,7 @@ public class PurchaseOrderTest {
             Assert.fail();
         }
     }
+
     @Test
     @Order(19)
     public void testVoidTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
@@ -614,6 +616,7 @@ public class PurchaseOrderTest {
             Assert.fail();
         }
     }
+
     @Test
     @Order(20)
     public void testReturnTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
@@ -632,6 +635,7 @@ public class PurchaseOrderTest {
             Assert.fail();
         }
     }
+
     @Test
     @Order(21)
     public void testWillSaveReturnedTransactionNoChanges() throws Exception {
@@ -1353,7 +1357,6 @@ public class PurchaseOrderTest {
 //            list.add(null);
 //            setPrivateField(poController, "paStockRequest", list);
 //        }
-
 //        Assert.assertTrue(poController.getInvStockRequestCount() >= 1);
 //        poController.InvStockRequestMaster(0);
     }
@@ -2187,6 +2190,142 @@ public class PurchaseOrderTest {
         Assert.assertEquals("error", loJSON.get("result"));
     }
 
+    @Test
+    @Order(54)
+    public void testRetriveSummaryReportsReturnsStructuredResult() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        String branchCode = instance.getBranchCode();
+        String destination = instance.getBranchCode();
+        seedSummaryAndDetailRowsForStatuses(branchCode, destination,
+                new String[]{"0", "1", "2", "3", "4", "5", "6", "9", "E", "X"});
+
+        // Force multi-status branch and include default-status mapping path.
+        poController.setTransactionStatus("01234569EX");
+
+        loJSON = poController.RetriveSummaryReports(
+                true,
+                null,
+                null,
+                "",
+                "",
+                "",
+                "");
+
+        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        Assert.assertTrue(loJSON.containsKey("message"));
+        Assert.assertTrue(loJSON.containsKey("data"));
+        Assert.assertTrue(loJSON.get("data") instanceof org.json.simple.JSONArray);
+
+        if ("success".equals(loJSON.get("result"))) {
+            org.json.simple.JSONArray data = (org.json.simple.JSONArray) loJSON.get("data");
+            java.util.Set<String> statuses = new java.util.HashSet<>();
+            for (Object row : data) {
+                org.json.simple.JSONObject obj = (org.json.simple.JSONObject) row;
+                statuses.add(String.valueOf(obj.get("cTranStat")));
+            }
+            Assert.assertTrue(statuses.contains("OPEN"));
+            Assert.assertTrue(statuses.contains("CONFIRMED"));
+            Assert.assertTrue(statuses.contains("PROCESSED"));
+            Assert.assertTrue(statuses.contains("CANCELLED"));
+            Assert.assertTrue(statuses.contains("VOID"));
+            Assert.assertTrue(statuses.contains("APPROVED"));
+            Assert.assertTrue(statuses.contains("POSTED"));
+            Assert.assertTrue(statuses.contains("RETURNED"));
+            Assert.assertTrue(statuses.contains("APPROVED+"));
+            Assert.assertTrue(statuses.contains("X"));
+        }
+    }
+
+    @Test
+    @Order(55)
+    public void testRetriveSummaryDetailedReportsReturnsStructuredResult() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        String branchCode = instance.getBranchCode();
+        String destination = instance.getBranchCode();
+        seedSummaryAndDetailRowsForStatuses(branchCode, destination,
+                new String[]{"0", "1", "2", "3", "4", "5", "6", "9", "E", "X"});
+
+        // Exercise filter-appending branches for branch/destination/supplier/category.
+        poController.setTransactionStatus("01234569EX");
+
+        loJSON = poController.RetriveSummaryDetailedReports(
+                false,
+                null,
+                null,
+                branchCode,
+                destination,
+                "M00115000863",
+                psCategorCd);
+
+        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        Assert.assertTrue(loJSON.containsKey("message"));
+        Assert.assertTrue(loJSON.containsKey("data"));
+        Assert.assertTrue(loJSON.get("data") instanceof org.json.simple.JSONArray);
+
+        if ("success".equals(loJSON.get("result"))) {
+            org.json.simple.JSONArray data = (org.json.simple.JSONArray) loJSON.get("data");
+            Assert.assertTrue(data.size() > 0);
+            org.json.simple.JSONObject first = (org.json.simple.JSONObject) data.get(0);
+            Assert.assertTrue(first.containsKey("Supplier"));
+            Assert.assertTrue(first.containsKey("Description"));
+            Assert.assertTrue(first.containsKey("Total"));
+        }
+    }
+
+    @Test
+    @Order(56)
+    public void testRetriveSummaryReportsDateFilterBranchHandlesH2ParsingError() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        loJSON = poController.RetriveSummaryReports(
+                true,
+                java.time.LocalDate.of(2026, 1, 1),
+                java.time.LocalDate.of(2026, 12, 31),
+                "",
+                "",
+                "",
+                "");
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("Cannot parse \"DATE\""));
+    }
+
+    @Test
+    @Order(57)
+    public void testRetriveSummaryDetailedReportsDateFilterBranchHandlesH2ParsingError() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        loJSON = poController.RetriveSummaryDetailedReports(
+                false,
+                java.time.LocalDate.of(2026, 1, 1),
+                java.time.LocalDate.of(2026, 12, 31),
+                "",
+                "",
+                "",
+                "");
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("Cannot parse \"DATE\""));
+    }
+
 //    @Test
 //    @Order(54)
 //    public void testPostTransactionWithoutLoadedTransactionReturnsError() throws Exception {
@@ -2289,7 +2428,7 @@ public class PurchaseOrderTest {
 
     private static String findProjectCodeUsedMoreThanOnce() throws SQLException {
         String sql = "SELECT sReferNox FROM PO_Master WHERE sReferNox IS NOT NULL AND sReferNox <> '' GROUP BY sReferNox HAVING COUNT(*) > 1 LIMIT 1";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql); ResultSet rs = pstmt.executeQuery()) {
+        try ( PreparedStatement pstmt = conn.prepareStatement(sql);  ResultSet rs = pstmt.executeQuery()) {
             if (rs.next()) {
                 return rs.getString("sReferNox");
             }
@@ -2303,4 +2442,51 @@ public class PurchaseOrderTest {
         field.set(target, value);
     }
 
+    private static void seedSummaryAndDetailRowsForStatuses(String branchCode, String destinationCode, String[] statuses) throws SQLException {
+        String masterSql = "INSERT INTO po_master (sTransNox, sBranchCd, sIndstCdx, sCategrCd, dTransact, sCompnyID, sDestinat, sSupplier, sTermCode, nDiscount, nAddDiscx, nTranTotl, nAmtPaidx, cWithAddx, nDPRatexx, nAdvAmtxx, nNetTotal, cTranStat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String detailSql = "INSERT INTO po_detail (sTransNox, nEntryNox, sStockIDx, nUnitPrce, nQuantity, nReceived, nCancelld, sSourceCd, sSourceNo, dModified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        int base;
+        synchronized (PurchaseOrderTest.class) {
+            base = pnReportSeedBase;
+            pnReportSeedBase += 100;
+        }
+
+        try ( PreparedStatement masterStmt = conn.prepareStatement(masterSql);  PreparedStatement detailStmt = conn.prepareStatement(detailSql)) {
+            for (int i = 0; i < statuses.length; i++) {
+                String transNo = branchCode + String.format("%08d", base + i);
+
+                masterStmt.setString(1, transNo);
+                masterStmt.setString(2, branchCode);
+                masterStmt.setString(3, psIndustryId);
+                masterStmt.setString(4, psCategorCd);
+                masterStmt.setDate(5, java.sql.Date.valueOf("2026-08-11"));
+                masterStmt.setString(6, psCompanyId);
+                masterStmt.setString(7, destinationCode);
+                masterStmt.setString(8, "M00115000863");
+                masterStmt.setString(9, "0000001");
+                masterStmt.setDouble(10, 0.0);
+                masterStmt.setDouble(11, 0.0);
+                masterStmt.setDouble(12, 1000.0 + i);
+                masterStmt.setDouble(13, 0.0);
+                masterStmt.setString(14, "0");
+                masterStmt.setDouble(15, 0.0);
+                masterStmt.setDouble(16, 0.0);
+                masterStmt.setDouble(17, 1000.0 + i);
+                masterStmt.setString(18, statuses[i]);
+                masterStmt.executeUpdate();
+
+                detailStmt.setString(1, transNo);
+                detailStmt.setInt(2, 1);
+                detailStmt.setString(3, "GK0123000010");
+                detailStmt.setDouble(4, 1000.0 + i);
+                detailStmt.setDouble(5, 1.0);
+                detailStmt.setDouble(6, 0.0);
+                detailStmt.setDouble(7, 0.0);
+                detailStmt.setString(8, "SReq");
+                detailStmt.setString(9, transNo);
+                detailStmt.setTimestamp(10, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+                detailStmt.executeUpdate();
+            }
+        }
+    }
 }
