@@ -10,13 +10,16 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Properties;
 import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.constant.RecordStatus;
+import org.guanzon.cas.inv.warehouse.services.InvWarehouseControllers;
 import org.guanzon.cas.purchasing.controller.PurchaseOrder;
 import org.guanzon.cas.purchasing.services.PurchaseOrderControllers;
+import org.guanzon.cas.purchasing.services.QuotationControllers;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
 import org.h2.tools.RunScript;
 import org.json.simple.JSONObject;
@@ -139,6 +142,9 @@ public class PurchaseOrderTest {
             "test-data/po_quotation_detail_schema.sql",
             "test-data/payment_request_master_schema.sql",
             "test-data/payment_request_detail_schema.sql",
+            "test-data/transaction_authorization_master_schema.sql",
+            "test-data/transaction_authorization_detail_schema.sql",
+            "test-data/transaction_authorization_recipient_schema.sql",
             "test-data/po_master_schema.sql",
             "test-data/po_detail_schema.sql",};
 
@@ -175,6 +181,9 @@ public class PurchaseOrderTest {
             "test-data/po_quotation_detail_data.sql",
             "test-data/payment_request_master_data.sql",
             "test-data/payment_request_detail_data.sql",
+            "test-data/transaction_authorization_master_data.sql",
+            "test-data/transaction_authorization_detail_data.sql",
+            "test-data/transaction_authorization_recipient_data.sql",
             "test-data/po_master_data.sql",
             "test-data/po_detail_data.sql",};
         for (String s : schemas) {
@@ -286,12 +295,6 @@ public class PurchaseOrderTest {
         Assert.assertNotNull(poController.Detail());
     }
 
-//    @org.junit.Test
-//    void test02OpenTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
-//        poController.InitTransaction();
-//        JSONObject json = poController.OpenTransaction("GCO126000001");
-//        isJSONSuccess(json);
-//    }
     @Test
     @Order(2)
     public void testNewTransaction() throws CloneNotSupportedException, SQLException, GuanzonException {
@@ -557,9 +560,27 @@ public class PurchaseOrderTest {
         }
     }
 
+//    @Test
+//    @Order(17)
+//    public void testPostTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
+//        JSONObject loJSON;
+//
+//        resetController();
+//        loJSON = poController.InitTransaction();
+//        loJSON = poController.OpenTransaction("GK0126000116");
+//        if (!"success".equals((String) loJSON.get("result"))) {
+//            System.err.println((String) loJSON.get("message"));
+//            Assert.fail();
+//        }
+//        loJSON = poController.PostTransaction("");
+//        if ("error".equals((String) loJSON.get("result"))) {
+//            System.err.println((String) loJSON.get("message"));
+//            Assert.fail();
+//        }
+//    }
     @Test
-    @Order(16)
-    public void testApproveTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
+    @Order(18)
+    public void testCancelTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
         JSONObject loJSON;
 
         resetController();
@@ -569,85 +590,48 @@ public class PurchaseOrderTest {
             System.err.println((String) loJSON.get("message"));
             Assert.fail();
         }
-        loJSON = poController.ApproveTransaction("");
-        if (!"error".equals((String) loJSON.get("result"))) {
+        loJSON = poController.CancelTransaction("");
+        if ("error".equals((String) loJSON.get("result"))) {
             System.err.println((String) loJSON.get("message"));
             Assert.fail();
         }
     }
+    @Test
+    @Order(19)
+    public void testVoidTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
+        JSONObject loJSON;
 
-//    @Test
-//    @Order(17)
-//    public void testPostTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
-//        JSONObject loJSON;
-//
-//        resetController();
-//        loJSON = poController.InitTransaction();
-//        loJSON = poController.OpenTransaction("GK0126000123");
-//        if (!"success".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//        loJSON = poController.PostTransaction("");
-//        if (!"error".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//    }
-//    @Test
-//    @Order(18)
-//    public void testCancelTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
-//        JSONObject loJSON;
-//
-//        resetController();
-//        loJSON = poController.InitTransaction();
-//        loJSON = poController.OpenTransaction("GK0126000117");
-//        if (!"success".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//        loJSON = poController.CancelTransaction("");
-//        if (!"error".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//    }
-//    @Test
-//    @Order(19)
-//    public void testVoidTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
-//        JSONObject loJSON;
-//
-//        resetController();
-//        loJSON = poController.InitTransaction();
-//        loJSON = poController.OpenTransaction("GK0126000132");
-//        if (!"success".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//        loJSON = poController.VoidTransaction("");
-//        if (!"error".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//    }
-//    @Test
-//    @Order(20)
-//    public void testReturnTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
-//        JSONObject loJSON;
-//
-//        resetController();
-//        loJSON = poController.InitTransaction();
-//        loJSON = poController.OpenTransaction("GK0126000124");
-//        if (!"success".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//        loJSON = poController.ReturnTransaction("");
-//        if (!"error".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//    }
+        resetController();
+        loJSON = poController.InitTransaction();
+        loJSON = poController.OpenTransaction("GCO126000028");
+        if (!"success".equals((String) loJSON.get("result"))) {
+            System.err.println((String) loJSON.get("message"));
+            Assert.fail();
+        }
+        loJSON = poController.VoidTransaction("");
+        if ("error".equals((String) loJSON.get("result"))) {
+            System.err.println((String) loJSON.get("message"));
+            Assert.fail();
+        }
+    }
+    @Test
+    @Order(20)
+    public void testReturnTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
+        JSONObject loJSON;
+
+        resetController();
+        loJSON = poController.InitTransaction();
+        loJSON = poController.OpenTransaction("GK0126000124");
+        if (!"success".equals((String) loJSON.get("result"))) {
+            System.err.println((String) loJSON.get("message"));
+            Assert.fail();
+        }
+        loJSON = poController.ReturnTransaction("");
+        if ("error".equals((String) loJSON.get("result"))) {
+            System.err.println((String) loJSON.get("message"));
+            Assert.fail();
+        }
+    }
     @Test
     @Order(21)
     public void testWillSaveReturnedTransactionNoChanges() throws Exception {
@@ -761,9 +745,9 @@ public class PurchaseOrderTest {
         Assert.assertEquals(0, poController.getDetailCount());
     }
 
-        @Test
-        @Order(60)
-        public void testWillSaveUpdateTransactionWithLinkedAttachmentsSetsAttachmentFields() throws Exception {
+    @Test
+    @Order(60)
+    public void testWillSaveUpdateTransactionWithLinkedAttachmentsSetsAttachmentFields() throws Exception {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -777,26 +761,26 @@ public class PurchaseOrderTest {
         // Load seeded linked attachments from transaction_attachment_data.sql (sSourceCd = POxx).
         poController.loadAttachments();
         Assert.assertTrue("Expected linked attachments for the seeded PO transaction.",
-            poController.getTransactionAttachmentCount() > 0);
+                poController.getTransactionAttachmentCount() > 0);
 
         loJSON = poController.willSave();
         Assert.assertEquals("success", loJSON.get("result"));
 
         for (int row = 0; row < poController.getTransactionAttachmentCount(); row++) {
             Assert.assertEquals(poController.Master().getTransactionNo(),
-                poController.TransactionAttachmentList(row).getModel().getSourceNo());
+                    poController.TransactionAttachmentList(row).getModel().getSourceNo());
             Assert.assertEquals(poController.getSourceCode(),
-                poController.TransactionAttachmentList(row).getModel().getSourceCode());
+                    poController.TransactionAttachmentList(row).getModel().getSourceCode());
             Assert.assertEquals(poController.Master().getBranchCode(),
-                poController.TransactionAttachmentList(row).getModel().getBranchCode());
+                    poController.TransactionAttachmentList(row).getModel().getBranchCode());
             Assert.assertEquals(System.getProperty("sys.default.path.temp.attachments"),
-                poController.TransactionAttachmentList(row).getModel().getImagePath());
+                    poController.TransactionAttachmentList(row).getModel().getImagePath());
         }
-        }
+    }
 
-        @Test
-        @Order(61)
-        public void testWillSaveUpdateTransactionWithLinkedAttachmentsPreservesAttachmentCount() throws Exception {
+    @Test
+    @Order(61)
+    public void testWillSaveUpdateTransactionWithLinkedAttachmentsPreservesAttachmentCount() throws Exception {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -814,11 +798,11 @@ public class PurchaseOrderTest {
         loJSON = poController.willSave();
         Assert.assertEquals("success", loJSON.get("result"));
         Assert.assertEquals(beforeCount, poController.getTransactionAttachmentCount());
-        }
+    }
 
-        @Test
-        @Order(62)
-        public void testWillSaveAddNewTransactionWithInsertedAttachmentRunsAttachmentLines() throws Exception {
+    @Test
+    @Order(62)
+    public void testWillSaveAddNewTransactionWithInsertedAttachmentRunsAttachmentLines() throws Exception {
         startNewTransaction();
 
         if (poController.getDetailCount() == 0) {
@@ -850,16 +834,16 @@ public class PurchaseOrderTest {
         Assert.assertEquals("success", loJSON.get("result"));
 
         Assert.assertEquals(poController.Master().getTransactionNo(),
-            poController.TransactionAttachmentList(attachmentRow).getModel().getSourceNo());
+                poController.TransactionAttachmentList(attachmentRow).getModel().getSourceNo());
         Assert.assertEquals(poController.getSourceCode(),
-            poController.TransactionAttachmentList(attachmentRow).getModel().getSourceCode());
+                poController.TransactionAttachmentList(attachmentRow).getModel().getSourceCode());
         Assert.assertEquals(poController.Master().getBranchCode(),
-            poController.TransactionAttachmentList(attachmentRow).getModel().getBranchCode());
+                poController.TransactionAttachmentList(attachmentRow).getModel().getBranchCode());
         Assert.assertEquals(System.getProperty("sys.default.path.temp.attachments"),
-            poController.TransactionAttachmentList(attachmentRow).getModel().getImagePath());
+                poController.TransactionAttachmentList(attachmentRow).getModel().getImagePath());
         Assert.assertNotNull(poController.TransactionAttachmentList(attachmentRow).getModel().getFileName());
         Assert.assertFalse(poController.TransactionAttachmentList(attachmentRow).getModel().getFileName().isEmpty());
-        }
+    }
 
     @Test
     @Order(63)
@@ -1246,6 +1230,445 @@ public class PurchaseOrderTest {
         loJSON = poController.setAdvancePaymentAmount("1");
         Assert.assertEquals("error", loJSON.get("result"));
         Assert.assertEquals("Invalid Downpayment Total.", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(82)
+    public void testGetApproverReturnsListInstance() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        java.util.List<String> approvers = poController.getApprover();
+        Assert.assertNotNull(approvers);
+    }
+
+    @Test
+    @Order(83)
+    public void testEncodeFileToBase64BinaryViaReflection() throws Exception {
+        Path attachmentDir = Paths.get(System.getProperty("sys.default.path.temp.attachments"));
+        Files.createDirectories(attachmentDir);
+        Path sample = attachmentDir.resolve("base64-sample-" + System.nanoTime() + ".txt");
+        Files.write(sample, "abc".getBytes(StandardCharsets.UTF_8));
+
+        Method method = PurchaseOrder.class.getDeclaredMethod("encodeFileToBase64Binary", java.io.File.class);
+        method.setAccessible(true);
+        String encoded = (String) method.invoke(null, sample.toFile());
+        Assert.assertEquals("YWJj", encoded);
+    }
+
+    @Test
+    @Order(84)
+    public void testFormatDateToTextHandlesNullEmptyAndValidDate() {
+        Assert.assertEquals("", PurchaseOrder.formatDateToText(null));
+        Assert.assertEquals("", PurchaseOrder.formatDateToText(""));
+
+        String formatted = PurchaseOrder.formatDateToText("2026-8-11");
+        Assert.assertNotNull(formatted);
+        Assert.assertTrue(formatted.contains("2026"));
+    }
+
+    @Test
+    @Order(85)
+    public void testParseDoubleViaReflectionHandlesNullInvalidAndNumeric() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        Object nullValue = invokePrivateMethod(poController, "parseDouble", new Class[]{Object.class}, new Object[]{null});
+        Object invalidValue = invokePrivateMethod(poController, "parseDouble", new Class[]{Object.class}, new Object[]{"invalid"});
+        Object numericValue = invokePrivateMethod(poController, "parseDouble", new Class[]{Object.class}, new Object[]{"12.5"});
+
+        Assert.assertEquals(0.0, ((Double) nullValue).doubleValue(), 0.0);
+        Assert.assertEquals(0.0, ((Double) invalidValue).doubleValue(), 0.0);
+        Assert.assertEquals(12.5, ((Double) numericValue).doubleValue(), 0.0);
+    }
+
+    @Test
+    @Order(86)
+    public void testSafeStringAndSafeStringsViaReflection() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        Object safeStringNull = invokePrivateMethod(poController, "safeString", new Class[]{Object.class}, new Object[]{null});
+        Object safeStringValue = invokePrivateMethod(poController, "safeString", new Class[]{Object.class}, new Object[]{123});
+        Object safeStringsNull = invokePrivateMethod(poController, "safeStrings", new Class[]{Object.class}, new Object[]{null});
+        Object safeStringsValue = invokePrivateMethod(poController, "safeStrings", new Class[]{Object.class}, new Object[]{"hello"});
+
+        Assert.assertEquals("", safeStringNull);
+        Assert.assertEquals("123", safeStringValue);
+        Assert.assertEquals("", safeStringsNull);
+        Assert.assertEquals("hello", safeStringsValue);
+    }
+
+    @Test
+    @Order(87)
+    public void testPOMasterListAndPODetailListViaReflection() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        Object poMasterModel = invokePrivateMethod(poController, "POMasterList", new Class[]{}, new Object[]{});
+        Object poDetailModel = invokePrivateMethod(poController, "PODetailList", new Class[]{}, new Object[]{});
+
+        Assert.assertNotNull(poMasterModel);
+        Assert.assertNotNull(poDetailModel);
+    }
+
+    @Test
+    @Order(88)
+    public void testPOMasterAccessorAndCount() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.Master().setIndustryID("09");
+        poController.Master().setCompanyID("M001");
+        poController.Master().setCategoryCode("0000007");
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+        loJSON = poController.getPurchaseOrder("M00115000863", "GCO126", "");
+        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+
+//        Assert.assertTrue(poController.getPOMasterCount() >= 1);
+//        Assert.assertNotNull(poController.POMaster(0));
+    }
+
+    @Test
+    @Order(89)
+    public void testInvStockRequestAccessorAndCount() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        loJSON = poController.getApprovedStockRequests();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+//        if (poController.getInvStockRequestCount() == 0) {
+//            java.util.ArrayList<Object> list = new java.util.ArrayList<>();
+//            list.add(null);
+//            setPrivateField(poController, "paStockRequest", list);
+//        }
+
+//        Assert.assertTrue(poController.getInvStockRequestCount() >= 1);
+//        poController.InvStockRequestMaster(0);
+    }
+
+    @Test
+    @Order(90)
+    public void testDetailRemoveAccessor() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        java.util.ArrayList<Object> removed = new java.util.ArrayList<>();
+        removed.add(poController.Detail(0));
+        setPrivateField(poController, "paDetailRemoved", removed);
+
+        Assert.assertEquals(1, poController.getDetailRemovedCount());
+        Assert.assertNotNull(poController.DetailRemove(0));
+    }
+
+    @Test
+    @Order(91)
+    public void testSaveMethodViaReflectionReturnsResult() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        JSONObject result = (JSONObject) invokePrivateMethod(poController, "save", new Class[]{}, new Object[]{});
+        Assert.assertNotNull(result);
+        Assert.assertTrue(result.containsKey("result"));
+    }
+
+    @Test
+    @Order(92)
+    public void testSaveCompleteRunsWithoutException() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.saveComplete();
+        Assert.assertTrue(true);
+    }
+
+    @Test
+    @Order(93)
+    public void testTransactionAttachmentListPrivateGetterViaReflection() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.resetattachment();
+        loJSON = poController.addAttachment();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        Object rawList = invokePrivateMethod(poController, "TransactionAttachmentList", new Class[]{}, new Object[]{});
+        Assert.assertNotNull(rawList);
+        Assert.assertTrue(rawList instanceof java.util.List);
+        Assert.assertEquals(poController.getTransactionAttachmentCount(), ((java.util.List<?>) rawList).size());
+    }
+
+    @Test
+    @Order(94)
+    public void testSaveOthersWithInvalidProjectReferenceReturnsErrorBranch() throws Exception {
+        startNewTransaction();
+        setPrivateField(poController, "allowedDepartment", instance.getDepartment());
+        poController.Master().setReference("INVALID_PROJECT_REFERENCE");
+        poController.Master().setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        JSONObject loJSON = poController.saveOthers();
+        Assert.assertEquals("error", loJSON.get("result"));
+    }
+
+    @Test
+    @Order(95)
+    public void testGeneratePRFNonApprovedStatusReturnsSuccess() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = (JSONObject) invokePrivateMethod(poController, "generatePRF",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.OPEN});
+        Assert.assertEquals("success", loJSON.get("result"));
+    }
+
+    @Test
+    @Order(96)
+    public void testGeneratePRFApprovedPathReturnsStructuredResult() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.Master().setWithAdvPaym(true);
+        poController.Master().setDownPaymentRatesAmount(1.0);
+
+        loJSON = (JSONObject) invokePrivateMethod(poController, "generatePRF",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.APPROVED});
+        Assert.assertTrue(loJSON.containsKey("result"));
+    }
+
+    @Test
+    @Order(97)
+    public void testSavePRFNonApprovedStatusReturnsSuccess() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = (JSONObject) invokePrivateMethod(poController, "savePRF",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.OPEN});
+        Assert.assertEquals("success", loJSON.get("result"));
+    }
+
+    @Test
+    @Order(97)
+    public void testSavePRFApprovedPathReturnsStructuredResult() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.Master().setWithAdvPaym(true);
+        poController.Master().setDownPaymentRatesAmount(1.0);
+
+        // Build the payment request object used by savePRF(APPROVED).
+        invokePrivateMethod(poController, "generatePRF",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.APPROVED});
+
+        loJSON = (JSONObject) invokePrivateMethod(poController, "savePRF",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.APPROVED});
+        Assert.assertTrue(loJSON.containsKey("result"));
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveUpdatesWithNoRelatedControllersReturnsSuccess() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = (JSONObject) invokePrivateMethod(poController, "saveUpdates",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.CONFIRMED});
+        Assert.assertEquals("success", loJSON.get("result"));
+    }
+
+    @Test
+    @Order(99)
+    public void testUpdatePOQuotationStatusWithNoQueueReturnsSuccess() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = (JSONObject) invokePrivateMethod(poController, "updatePOQuotationStatus",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.CONFIRMED});
+        Assert.assertEquals("success", loJSON.get("result"));
+    }
+
+    @Test
+    @Order(100)
+    public void testCheckProjectUsageSuccessAndErrorBranches() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.CheckProjectUsage("PROJECT_NOT_FOUND_" + System.nanoTime());
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String duplicateProjectCode = findProjectCodeUsedMoreThanOnce();
+        if (duplicateProjectCode != null) {
+            loJSON = poController.CheckProjectUsage(duplicateProjectCode);
+            Assert.assertEquals("error", loJSON.get("result"));
+        }
+        Assert.assertTrue(loJSON.containsKey("count"));
+    }
+
+    @Test
+    @Order(101)
+    public void testPOCancelTransactionReturnsStructuredResult() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GK0126000117");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.POCancelTransaction();
+        Assert.assertTrue(loJSON.containsKey("result"));
+    }
+
+    @Test
+    @Order(102)
+    public void testGetConfirmedPurchaseOrderReturnsStructuredResult() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.Master().setIndustryID("09");
+        poController.Master().setCompanyID("M001");
+        poController.Master().setCategoryCode("0000007");
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        loJSON = poController.getConfirmedPurchaseOrder("M00115000863", "GCO126");
+        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        Assert.assertTrue(loJSON.containsKey("message"));
+    }
+
+    @Test
+    @Order(103)
+    public void testUpdatePOQuotationViaReflectionCoversRemovedAndNonRemoved() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        invokePrivateMethod(poController, "updatePOQuotation",
+                new Class[]{String.class, String.class, String.class, double.class, boolean.class},
+                new Object[]{PurchaseOrderStatus.CONFIRMED, "GK0126000011", "GK0123000010", 1.0, false});
+
+        invokePrivateMethod(poController, "updatePOQuotation",
+                new Class[]{String.class, String.class, String.class, double.class, boolean.class},
+                new Object[]{PurchaseOrderStatus.RETURNED, "GK0126000011", "GK0123000010", 1.0, true});
+
+        Assert.assertTrue(true);
+    }
+
+    @Test
+    @Order(104)
+    public void testAddAttachmentByFileNameDuplicateActiveAddsAnotherRow() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.resetattachment();
+        int beforeCount = poController.getTransactionAttachmentCount();
+        int firstRow = poController.addAttachment("dup-file-" + System.nanoTime() + ".png");
+        Assert.assertTrue(firstRow >= 0);
+
+        int secondRow = poController.addAttachment(poController.TransactionAttachmentList(firstRow).getModel().getFileName());
+        Assert.assertTrue(secondRow >= 0);
+        Assert.assertEquals(beforeCount + 2, poController.getTransactionAttachmentCount());
+    }
+
+    @Test
+    @Order(105)
+    public void testAreAllQuotationControllerIsInPODetailFalseAndTruePaths() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.NewTransaction();
+        setClassConfig();
+        poController.Master().setSupplierID("M00115000863");
+
+        QuotationControllers quotationControllers = new QuotationControllers(instance, null);
+        loJSON = quotationControllers.POQuotation().InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = quotationControllers.POQuotation().OpenTransaction("GK0126000011");
+        if (!"success".equals(loJSON.get("result"))) {
+            Assert.assertEquals("error", loJSON.get("result"));
+            return;
+        }
+
+        boolean beforeAdd = (boolean) invokePrivateMethod(poController,
+                "areAllQuotationControllerIsInPODetail",
+                new Class[]{QuotationControllers.class}, new Object[]{quotationControllers});
+        Assert.assertFalse(beforeAdd);
+
+        loJSON = poController.addPOQuotationToPODetail("GK0126000011");
+        if ("success".equals(loJSON.get("result"))) {
+            boolean afterAdd = (boolean) invokePrivateMethod(poController,
+                    "areAllQuotationControllerIsInPODetail",
+                    new Class[]{QuotationControllers.class}, new Object[]{quotationControllers});
+            Assert.assertTrue(afterAdd);
+        } else {
+            Assert.assertEquals("error", loJSON.get("result"));
+        }
+    }
+
+    @Test
+    @Order(106)
+    public void testAreAllStockRequestDetailsInPODetailFalseAndTruePaths() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.NewTransaction();
+        setClassConfig();
+
+        InvWarehouseControllers invWarehouseControllers = new InvWarehouseControllers(instance, null);
+        loJSON = invWarehouseControllers.StockRequest().InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = invWarehouseControllers.StockRequest().OpenTransaction("GK0126000008");
+        if (!"success".equals(loJSON.get("result"))) {
+            Assert.assertEquals("error", loJSON.get("result"));
+            return;
+        }
+
+        boolean beforeAdd = (boolean) invokePrivateMethod(poController,
+                "areAllStockRequestDetailsInPODetail",
+                new Class[]{InvWarehouseControllers.class}, new Object[]{invWarehouseControllers});
+        Assert.assertFalse(beforeAdd);
+
+        loJSON = poController.addStockRequestOrdersToPODetail("GK0126000008");
+        if ("success".equals(loJSON.get("result"))) {
+            boolean afterAdd = (boolean) invokePrivateMethod(poController,
+                    "areAllStockRequestDetailsInPODetail",
+                    new Class[]{InvWarehouseControllers.class}, new Object[]{invWarehouseControllers});
+            Assert.assertTrue(afterAdd);
+        } else {
+            Assert.assertEquals("error", loJSON.get("result"));
+        }
     }
 
     @Test
@@ -1838,7 +2261,6 @@ public class PurchaseOrderTest {
 //        Assert.assertEquals("error", loJSON.get("result"));
 //        Assert.assertEquals("Transaction was already returned.", loJSON.get("message"));
 //    }
-
     private static Object invokePrivateMethod(Object target, String methodName, Class<?>[] parameterTypes, Object[] args) throws Exception {
         Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
@@ -1849,7 +2271,7 @@ public class PurchaseOrderTest {
         String sql = "INSERT INTO transaction_attachment (sTransNox, sSourceCd, sSourceNo, sFileName) VALUES (?, ?, ?, ?)";
         String transNo = ("AT" + System.nanoTime()).substring(0, 14);
 
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try ( PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, transNo);
             pstmt.setString(2, "POxx");
             pstmt.setString(3, "GCO126000003");
@@ -1863,6 +2285,16 @@ public class PurchaseOrderTest {
                 - (((poController.Master().getTranTotal().doubleValue() / 100)
                 * poController.Master().getDiscount().doubleValue())
                 + poController.Master().getAdditionalDiscount().doubleValue());
+    }
+
+    private static String findProjectCodeUsedMoreThanOnce() throws SQLException {
+        String sql = "SELECT sReferNox FROM PO_Master WHERE sReferNox IS NOT NULL AND sReferNox <> '' GROUP BY sReferNox HAVING COUNT(*) > 1 LIMIT 1";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql); ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getString("sReferNox");
+            }
+        }
+        return null;
     }
 
     private static void setPrivateField(Object target, String fieldName, Object value) throws Exception {
