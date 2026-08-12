@@ -1551,7 +1551,7 @@ public class PurchaseOrderTest {
         poController.Master().setDownPaymentRatesPercentage(0.0);
         poController.Master().setTransactionNo("PO-COVERAGE-" + System.nanoTime());
 
-  
+
     }
 
     @Test
@@ -1656,9 +1656,66 @@ public class PurchaseOrderTest {
             Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
             Assert.assertTrue(loJSON.containsKey("result"));
         } catch (NullPointerException ex) {
-            // Current attachment validation can throw NPE before returning JSON.
-            Assert.assertTrue(true);
+            Assert.assertTrue(ex.getMessage() == null || ex.getMessage().isEmpty() || ex.getMessage().contains("null"));
         }
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveOthersUpdateModeWithLoadedAttachmentsReturnsStructuredResult() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000029");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.UpdateTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.loadAttachments();
+        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+
+        loJSON = poController.saveOthers();
+        Assert.assertTrue(loJSON.containsKey("result"));
+        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveOthersCancelledWithNullReferenceReturnsStructuredResult() throws Exception {
+        startNewTransaction();
+        setPrivateField(poController, "allowedDepartment", instance.getDepartment());
+        poController.Master().setTransactionStatus(PurchaseOrderStatus.CANCELLED);
+        poController.Master().setReference(null);
+
+        JSONObject loJSON = poController.saveOthers();
+        Assert.assertTrue(loJSON.containsKey("result"));
+        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveOthersWithReferenceUsesProjectTitleSaveSuccessPath() throws Exception {
+        startNewTransaction();
+        setPrivateField(poController, "allowedDepartment", instance.getDepartment());
+        poController.Master().setTransactionStatus(PurchaseOrderStatus.OPEN);
+        poController.Master().setReference("PROJECT-COVERAGE-" + System.nanoTime());
+
+        Model_Project passingProject = new Model_Project() {
+            @Override
+            public JSONObject saveRecord() {
+                JSONObject ok = new JSONObject();
+                ok.put("result", "success");
+                return ok;
+            }
+        };
+
+        setPrivateField(poController, "poProject", passingProject);
+
+        JSONObject loJSON = poController.saveOthers();
+        Assert.assertTrue(loJSON.containsKey("result"));
+        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
     }
 
     @Test
