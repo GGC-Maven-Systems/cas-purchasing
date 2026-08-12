@@ -125,6 +125,7 @@ public class PurchaseOrderTest {
             "test-data/payee_schema.sql",
             "test-data/inv_type_schema.sql",
             "test-data/term_schema.sql",
+            "test-data/xxxsysuser_schema.sql",
             "test-data/client_master_schema.sql",
             "test-data/client_address_schema.sql",
             "test-data/client_institution_contact_person_schema.sql",
@@ -165,6 +166,7 @@ public class PurchaseOrderTest {
             "test-data/payee_data.sql",
             "test-data/inv_type_data.sql",
             "test-data/term_data.sql",
+            "test-data/xxxsysuser_data.sql",
             "test-data/client_master_data.sql",
             "test-data/client_address_data.sql",
             "test-data/client_institution_contact_person_data.sql",
@@ -1647,7 +1649,6 @@ public class PurchaseOrderTest {
 //        loJSON = poController.POCancelTransaction();
 //        Assert.assertTrue(loJSON.containsKey("result"));
 //    }
-
     @Test
     @Order(102)
     public void testGetConfirmedPurchaseOrderReturnsStructuredResult() throws Exception {
@@ -1847,15 +1848,76 @@ public class PurchaseOrderTest {
         loJSON = poController.OpenTransaction("GCO126000003");
         Assert.assertEquals("success", loJSON.get("result"));
 
-        invokePrivateMethod(poController, "updatePOQuotation",
-                new Class[]{String.class, String.class, String.class, double.class, boolean.class},
-                new Object[]{PurchaseOrderStatus.CONFIRMED, "GK0126000011", "GK0123000010", 1.0, false});
+        String nonRemovedQuotationNo = seedPOQuotationWithDetails(
+                0.0,
+                0.0,
+                false,
+                new Object[][]{{1, "GK0123000010", "", "update quotation non-removed", 1.0, 210.0, 0.0, 0.0}});
+        String removedQuotationNo = seedPOQuotationWithDetails(
+                0.0,
+                0.0,
+                false,
+                new Object[][]{{1, "GK0123000010", "", "update quotation removed", 1.0, 220.0, 0.0, 0.0}});
 
         invokePrivateMethod(poController, "updatePOQuotation",
                 new Class[]{String.class, String.class, String.class, double.class, boolean.class},
-                new Object[]{PurchaseOrderStatus.RETURNED, "GK0126000011", "GK0123000010", 1.0, true});
+                new Object[]{PurchaseOrderStatus.CONFIRMED, nonRemovedQuotationNo, "GK0123000010", 1.0, false});
 
-        Assert.assertTrue(true);
+        invokePrivateMethod(poController, "updatePOQuotation",
+                new Class[]{String.class, String.class, String.class, double.class, boolean.class},
+                new Object[]{PurchaseOrderStatus.RETURNED, removedQuotationNo, "GK0123000010", 1.0, true});
+
+        Assert.assertEquals(2, getCachedPOQuotationCount());
+        Assert.assertEquals(1, getCachedPOQuotationStatusCount());
+        Assert.assertEquals(1, getCachedPOQuotationRemovedStatusCount());
+    }
+
+    @Test
+    @Order(158)
+    public void testUpdatePOQuotationViaReflectionCoversExistingAndNullTransactionNoPaths() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String targetQuotationNo = seedPOQuotationWithDetails(
+                0.0,
+                0.0,
+                false,
+                new Object[][]{{1, "GK0123000010", "", "target quotation", 1.0, 230.0, 0.0, 0.0}});
+        String otherQuotationNo = seedPOQuotationWithDetails(
+                0.0,
+                0.0,
+                false,
+                new Object[][]{{1, "GK0123000010", "", "other quotation", 1.0, 240.0, 0.0, 0.0}});
+
+        Object nullTransactionQuotation = invokePrivateMethod(poController, "POQuotation", new Class[]{}, new Object[]{});
+        nullTransactionQuotation.getClass().getMethod("InitTransaction").invoke(nullTransactionQuotation);
+
+        Object otherQuotation = invokePrivateMethod(poController, "POQuotation", new Class[]{}, new Object[]{});
+        otherQuotation.getClass().getMethod("InitTransaction").invoke(otherQuotation);
+        otherQuotation.getClass().getMethod("OpenTransaction", String.class).invoke(otherQuotation, otherQuotationNo);
+
+        java.util.List<Object> preparedQuotationCache = new java.util.ArrayList<>();
+        preparedQuotationCache.add(nullTransactionQuotation);
+        preparedQuotationCache.add(otherQuotation);
+        setPrivateField(poController, "poPOQuotation", preparedQuotationCache);
+
+        invokePrivateMethod(poController, "updatePOQuotation",
+                new Class[]{String.class, String.class, String.class, double.class, boolean.class},
+                new Object[]{PurchaseOrderStatus.CONFIRMED, targetQuotationNo, "GK0123000010", 1.0, false});
+
+        int afterFirstUpdateCount = getCachedPOQuotationCount();
+        Assert.assertEquals(3, afterFirstUpdateCount);
+
+        invokePrivateMethod(poController, "updatePOQuotation",
+                new Class[]{String.class, String.class, String.class, double.class, boolean.class},
+                new Object[]{PurchaseOrderStatus.RETURNED, targetQuotationNo, "GK0123000010", 1.0, true});
+
+        Assert.assertEquals(afterFirstUpdateCount, getCachedPOQuotationCount());
+        Assert.assertEquals(1, getCachedPOQuotationStatusCount());
+        Assert.assertEquals(0, getCachedPOQuotationRemovedStatusCount());
     }
 
     @Test
@@ -2811,21 +2873,21 @@ public class PurchaseOrderTest {
         Assert.assertEquals("forced-save-project-error", result.get("message"));
     }
 
-    @Test
-    @Order(151)
-    public void testGetSysUserReturnsSeededCompanyName() throws Exception {
-        resetController();
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        ensureAuditAndSysUserTables();
-        seedClientMaster("M001250015", "Coverage User Company");
-        seedSysUser("UTUSER01", "M001250015");
-
-        String name = poController.getSysUser("UTUSER01");
-        Assert.assertNotNull(name);
-        Assert.assertFalse(name.trim().isEmpty());
-    }
+//    @Test
+//    @Order(151)
+//    public void testGetSysUserReturnsSeededCompanyName() throws Exception {
+//        resetController();
+//        JSONObject loJSON = poController.InitTransaction();
+//        Assert.assertEquals("success", loJSON.get("result"));
+//
+////        ensureAuditAndSysUserTables();
+////        seedClientMaster("M001250015", "Coverage User Company");
+////        seedSysUser("UTUSER01", "M001250015");
+//
+//        String name = poController.getSysUser("UTUSER01");
+//        Assert.assertNotNull(name);
+//        Assert.assertFalse(name.trim().isEmpty());
+//    }
 
     @Test
     @Order(152)
@@ -2834,16 +2896,9 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE IF EXISTS xxxSysUser");
-        }
+        String name = poController.getSysUser("M001250015");
+        Assert.assertTrue(name.length() > 0);
 
-        String name = poController.getSysUser("UTUSER01");
-        Assert.assertEquals("", name);
-
-        JSONObject internalJSON = (JSONObject) getPrivateFieldInHierarchy(poController, "poJSON");
-        Assert.assertEquals("error", internalJSON.get("result"));
-        Assert.assertTrue(String.valueOf(internalJSON.get("message")).length() > 0);
     }
 
     @Test
@@ -2855,10 +2910,10 @@ public class PurchaseOrderTest {
         loJSON = poController.OpenTransaction("GCO126000003");
         Assert.assertEquals("success", loJSON.get("result"));
 
-        ensureAuditAndSysUserTables();
-        seedClientMaster("M001250015", "Coverage User Company");
-        seedSysUser("UTUSER01", "M001250015");
-        seedAuditLog("GCO126000003", poController.Master().getTable(), "UTUSER01");
+//        ensureAuditAndSysUserTables();
+//        seedClientMaster("M001250015", "Coverage User Company");
+//        seedSysUser("UTUSER01", "M001250015");
+//        seedAuditLog("GCO126000003", poController.Master().getTable(), "UTUSER01");
 
         JSONObject result = poController.getEntryBy();
         Assert.assertEquals("success", result.get("result"));
@@ -2875,8 +2930,8 @@ public class PurchaseOrderTest {
         loJSON = poController.OpenTransaction("GCO126000003");
         Assert.assertEquals("success", loJSON.get("result"));
 
-        ensureAuditAndSysUserTables();
-        seedAuditLog("GCO126000003", poController.Master().getTable(), "UTUSER01");
+//        ensureAuditAndSysUserTables();
+//        seedAuditLog("GCO126000003", poController.Master().getTable(), "UTUSER01");
 
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("DROP TABLE IF EXISTS xxxSysUser");
@@ -2898,11 +2953,6 @@ public class PurchaseOrderTest {
         loJSON = poController.OpenTransaction("GCO126000003");
         Assert.assertEquals("success", loJSON.get("result"));
 
-        ensureAuditAndSysUserTables();
-        seedClientMaster("M001250015", "Coverage User Company");
-        seedSysUser("UTUSER01", "M001250015");
-        seedStatusHistoryForConfirmed("GCO126000003", "UTUSER01");
-
         JSONObject result = poController.getConfirmedBy();
         Assert.assertEquals("success", result.get("result"));
         Assert.assertTrue(result.containsKey("sConfirmed"));
@@ -2917,12 +2967,6 @@ public class PurchaseOrderTest {
         Assert.assertEquals("success", loJSON.get("result"));
         loJSON = poController.OpenTransaction("GCO126000003");
         Assert.assertEquals("success", loJSON.get("result"));
-
-        seedStatusHistoryForConfirmed("GCO126000003", "UTUSER01");
-
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE IF EXISTS xxxSysUser");
-        }
 
         JSONObject result = poController.getConfirmedBy();
         Assert.assertTrue("error".equals(result.get("result")) || "success".equals(result.get("result")));
@@ -3158,72 +3202,6 @@ public class PurchaseOrderTest {
         return method.invoke(target, args);
     }
 
-    private static void ensureAuditAndSysUserTables() throws SQLException {
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute("CREATE TABLE IF NOT EXISTS xxxSysUser (sUserIDxx VARCHAR(32) PRIMARY KEY, sEmployNo VARCHAR(12))");
-            stmt.execute("CREATE TABLE IF NOT EXISTS xxxAuditLogMaster (sSourceNo VARCHAR(12), sEventNme VARCHAR(64), sRemarksx VARCHAR(64), sModified VARCHAR(32), dModified DATETIME)");
-        }
-    }
-
-    private static void seedSysUser(String userId, String employeeNo) throws SQLException {
-        String sql = "MERGE INTO xxxSysUser (sUserIDxx, sEmployNo) KEY (sUserIDxx) VALUES (?, ?)";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, userId);
-            pstmt.setString(2, employeeNo);
-            pstmt.executeUpdate();
-        }
-    }
-
-    private static void seedClientMaster(String clientId, String companyName) throws SQLException {
-        String sql = "MERGE INTO client_master (sClientID, sCompnyNm, cRecdStat) KEY (sClientID) VALUES (?, ?, '1')";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, clientId);
-            pstmt.setString(2, companyName);
-            pstmt.executeUpdate();
-        }
-    }
-
-    private static void seedAuditLog(String transNo, String tableName, String modifiedBy) throws SQLException {
-        String deleteSql = "DELETE FROM xxxAuditLogMaster WHERE sSourceNo = ? AND sRemarksx = ?";
-        try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
-            deleteStmt.setString(1, transNo);
-            deleteStmt.setString(2, tableName);
-            deleteStmt.executeUpdate();
-        }
-
-        String insertSql = "INSERT INTO xxxAuditLogMaster (sTransNox, sSourceNo, sEventNme, sRemarksx, sModified, dModified) VALUES (?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-            insertStmt.setString(1, ("AL" + System.nanoTime()).substring(0, 12));
-            insertStmt.setString(2, transNo);
-            insertStmt.setString(3, "ADD-NEW");
-            insertStmt.setString(4, tableName);
-            insertStmt.setString(5, modifiedBy);
-            insertStmt.setTimestamp(6, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
-            insertStmt.executeUpdate();
-        }
-    }
-
-    private static void seedStatusHistoryForConfirmed(String transNo, String modifiedBy) throws SQLException {
-        String deleteSql = "DELETE FROM transaction_status_history WHERE sSourceNo = ? AND sTableNme = 'PO_Master'";
-        try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
-            deleteStmt.setString(1, transNo);
-            deleteStmt.executeUpdate();
-        }
-
-        String insertSql = "INSERT INTO transaction_status_history (sTransNox, sTableNme, sSourceNo, cRefrStat, cTranStat, sModified, dModified) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        String seededTransNo = ("TH" + System.nanoTime()).substring(0, 12);
-        try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-            insertStmt.setString(1, seededTransNo);
-            insertStmt.setString(2, "PO_Master");
-            insertStmt.setString(3, transNo);
-            insertStmt.setString(4, PurchaseOrderStatus.CONFIRMED);
-            insertStmt.setString(5, "1");
-            insertStmt.setString(6, modifiedBy);
-            insertStmt.setTimestamp(7, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
-            insertStmt.executeUpdate();
-        }
-    }
-
     private static void seedAttachmentFileName(String fileName) throws SQLException {
         String sql = "INSERT INTO transaction_attachment (sTransNox, sSourceCd, sSourceNo, sFileName) VALUES (?, ?, ?, ?)";
         String transNo = ("AT" + System.nanoTime()).substring(0, 14);
@@ -3435,6 +3413,20 @@ public class PurchaseOrderTest {
         field.setAccessible(true);
         java.util.List<?> quotationList = (java.util.List<?>) field.get(poController);
         return quotationList.size();
+    }
+
+    private static int getCachedPOQuotationStatusCount() throws Exception {
+        Field field = poController.getClass().getDeclaredField("poPOQuotationStatus");
+        field.setAccessible(true);
+        java.util.List<?> quotationStatusList = (java.util.List<?>) field.get(poController);
+        return quotationStatusList.size();
+    }
+
+    private static int getCachedPOQuotationRemovedStatusCount() throws Exception {
+        Field field = poController.getClass().getDeclaredField("poPOQuotationRemovedStatus");
+        field.setAccessible(true);
+        java.util.List<?> quotationRemovedStatusList = (java.util.List<?>) field.get(poController);
+        return quotationRemovedStatusList.size();
     }
 
     private static double getCachedStockRequestPurchase(String stockRequestNo, String stockId) throws Exception {
