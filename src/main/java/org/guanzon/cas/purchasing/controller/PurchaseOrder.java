@@ -2732,13 +2732,16 @@ public class PurchaseOrder extends Transaction {
                     }
                 }
             }
+            Detail(row).setBrandId(object.getModel().getBrandId());
             Detail(row).setStockID(object.getModel().getStockId());
             Detail(row).setUnitPrice(object.getModel().getCost().doubleValue());
             Detail(row).setOldPrice(object.getModel().getCost().doubleValue());
-            Detail(row).setBrandId(brand);
+
         }
         return poJSON;
     }
+
+
 
     private String getInvStockRequest_SQL() {
         return "SELECT"
