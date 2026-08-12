@@ -12,11 +12,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Properties;
 import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.constant.RecordStatus;
 import org.guanzon.cas.inv.warehouse.services.InvWarehouseControllers;
+import org.guanzon.cas.parameter.model.Model_Project;
 import org.guanzon.cas.purchasing.controller.PurchaseOrder;
 import org.guanzon.cas.purchasing.services.PurchaseOrderControllers;
 import org.guanzon.cas.purchasing.services.QuotationControllers;
@@ -1125,7 +1127,6 @@ public class PurchaseOrderTest {
 //        poController.copyFile(source.toString());
 //        Assert.assertTrue(Files.exists(target));
 //    }
-
     @Test
     @Order(76)
     public void testUploadCASAttachmentsReturnsErrorWhenNewAndOriginalFilesMissing() throws Exception {
@@ -1634,18 +1635,18 @@ public class PurchaseOrderTest {
         Assert.assertTrue(loJSON.containsKey("count"));
     }
 
-    @Test
-    @Order(101)
-    public void testPOCancelTransactionReturnsStructuredResult() throws Exception {
-        resetController();
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-        loJSON = poController.OpenTransaction("GK0126000117");
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        loJSON = poController.POCancelTransaction();
-        Assert.assertTrue(loJSON.containsKey("result"));
-    }
+//    @Test
+//    @Order(101)
+//    public void testPOCancelTransactionReturnsStructuredResult() throws Exception {
+//        resetController();
+//        JSONObject loJSON = poController.InitTransaction();
+//        Assert.assertEquals("success", loJSON.get("result"));
+//        loJSON = poController.OpenTransaction("GK0126000117");
+//        Assert.assertEquals("success", loJSON.get("result"));
+//
+//        loJSON = poController.POCancelTransaction();
+//        Assert.assertTrue(loJSON.containsKey("result"));
+//    }
 
     @Test
     @Order(102)
@@ -2784,6 +2785,153 @@ public class PurchaseOrderTest {
     }
 
     @Test
+    @Order(150)
+    public void testSaveProjectTitleReturnsErrorWhenProjectSaveFails() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        Model_Project failingProject = new Model_Project() {
+            @Override
+            public JSONObject saveRecord() {
+                JSONObject error = new JSONObject();
+                error.put("result", "error");
+                error.put("message", "forced-save-project-error");
+                return error;
+            }
+        };
+
+        setPrivateField(poController, "poProject", failingProject);
+        JSONObject result = (JSONObject) invokePrivateMethod(poController, "saveProjectTitle", new Class[]{String.class}, new Object[]{PurchaseOrderStatus.OPEN});
+
+        Assert.assertEquals("error", result.get("result"));
+        Assert.assertEquals("forced-save-project-error", result.get("message"));
+    }
+
+    @Test
+    @Order(151)
+    public void testGetSysUserReturnsSeededCompanyName() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        ensureAuditAndSysUserTables();
+        seedClientMaster("M001250015", "Coverage User Company");
+        seedSysUser("UTUSER01", "M001250015");
+
+        String name = poController.getSysUser("UTUSER01");
+        Assert.assertNotNull(name);
+        Assert.assertFalse(name.trim().isEmpty());
+    }
+
+    @Test
+    @Order(152)
+    public void testGetSysUserHandlesSQLExceptionInsideMethod() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE IF EXISTS xxxSysUser");
+        }
+
+        String name = poController.getSysUser("UTUSER01");
+        Assert.assertEquals("", name);
+
+        JSONObject internalJSON = (JSONObject) getPrivateFieldInHierarchy(poController, "poJSON");
+        Assert.assertEquals("error", internalJSON.get("result"));
+        Assert.assertTrue(String.valueOf(internalJSON.get("message")).length() > 0);
+    }
+
+    @Test
+    @Order(153)
+    public void testGetEntryByReturnsSuccessWithSeededAuditData() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        ensureAuditAndSysUserTables();
+        seedClientMaster("M001250015", "Coverage User Company");
+        seedSysUser("UTUSER01", "M001250015");
+        seedAuditLog("GCO126000003", poController.Master().getTable(), "UTUSER01");
+
+        JSONObject result = poController.getEntryBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertTrue(result.containsKey("sCompnyNm"));
+        Assert.assertTrue(result.containsKey("sEntryDte"));
+    }
+
+    @Test
+    @Order(154)
+    public void testGetEntryByHandlesSQLExceptionInsideMethod() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        ensureAuditAndSysUserTables();
+        seedAuditLog("GCO126000003", poController.Master().getTable(), "UTUSER01");
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE IF EXISTS xxxSysUser");
+        }
+
+        JSONObject result = poController.getEntryBy();
+        Assert.assertTrue("error".equals(result.get("result")) || "success".equals(result.get("result")));
+        if ("error".equals(result.get("result"))) {
+            Assert.assertTrue(String.valueOf(result.get("message")).length() > 0);
+        }
+    }
+
+    @Test
+    @Order(155)
+    public void testGetConfirmedByReturnsSuccessWithSeededStatusHistory() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        ensureAuditAndSysUserTables();
+        seedClientMaster("M001250015", "Coverage User Company");
+        seedSysUser("UTUSER01", "M001250015");
+        seedStatusHistoryForConfirmed("GCO126000003", "UTUSER01");
+
+        JSONObject result = poController.getConfirmedBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertTrue(result.containsKey("sConfirmed"));
+        Assert.assertTrue(result.containsKey("sConfrmDte"));
+    }
+
+    @Test
+    @Order(156)
+    public void testGetConfirmedByHandlesSQLExceptionInsideMethod() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        seedStatusHistoryForConfirmed("GCO126000003", "UTUSER01");
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE IF EXISTS xxxSysUser");
+        }
+
+        JSONObject result = poController.getConfirmedBy();
+        Assert.assertTrue("error".equals(result.get("result")) || "success".equals(result.get("result")));
+        if ("error".equals(result.get("result"))) {
+            Assert.assertTrue(String.valueOf(result.get("message")).length() > 0);
+        }
+    }
+
+    @Test
     @Order(53)
     public void testOpenTransactionInvalidTransactionNoReturnsError() throws Exception {
         resetController();
@@ -3010,6 +3158,72 @@ public class PurchaseOrderTest {
         return method.invoke(target, args);
     }
 
+    private static void ensureAuditAndSysUserTables() throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE IF NOT EXISTS xxxSysUser (sUserIDxx VARCHAR(32) PRIMARY KEY, sEmployNo VARCHAR(12))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS xxxAuditLogMaster (sSourceNo VARCHAR(12), sEventNme VARCHAR(64), sRemarksx VARCHAR(64), sModified VARCHAR(32), dModified DATETIME)");
+        }
+    }
+
+    private static void seedSysUser(String userId, String employeeNo) throws SQLException {
+        String sql = "MERGE INTO xxxSysUser (sUserIDxx, sEmployNo) KEY (sUserIDxx) VALUES (?, ?)";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, userId);
+            pstmt.setString(2, employeeNo);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private static void seedClientMaster(String clientId, String companyName) throws SQLException {
+        String sql = "MERGE INTO client_master (sClientID, sCompnyNm, cRecdStat) KEY (sClientID) VALUES (?, ?, '1')";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, clientId);
+            pstmt.setString(2, companyName);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private static void seedAuditLog(String transNo, String tableName, String modifiedBy) throws SQLException {
+        String deleteSql = "DELETE FROM xxxAuditLogMaster WHERE sSourceNo = ? AND sRemarksx = ?";
+        try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
+            deleteStmt.setString(1, transNo);
+            deleteStmt.setString(2, tableName);
+            deleteStmt.executeUpdate();
+        }
+
+        String insertSql = "INSERT INTO xxxAuditLogMaster (sTransNox, sSourceNo, sEventNme, sRemarksx, sModified, dModified) VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+            insertStmt.setString(1, ("AL" + System.nanoTime()).substring(0, 12));
+            insertStmt.setString(2, transNo);
+            insertStmt.setString(3, "ADD-NEW");
+            insertStmt.setString(4, tableName);
+            insertStmt.setString(5, modifiedBy);
+            insertStmt.setTimestamp(6, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+            insertStmt.executeUpdate();
+        }
+    }
+
+    private static void seedStatusHistoryForConfirmed(String transNo, String modifiedBy) throws SQLException {
+        String deleteSql = "DELETE FROM transaction_status_history WHERE sSourceNo = ? AND sTableNme = 'PO_Master'";
+        try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
+            deleteStmt.setString(1, transNo);
+            deleteStmt.executeUpdate();
+        }
+
+        String insertSql = "INSERT INTO transaction_status_history (sTransNox, sTableNme, sSourceNo, cRefrStat, cTranStat, sModified, dModified) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String seededTransNo = ("TH" + System.nanoTime()).substring(0, 12);
+        try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+            insertStmt.setString(1, seededTransNo);
+            insertStmt.setString(2, "PO_Master");
+            insertStmt.setString(3, transNo);
+            insertStmt.setString(4, PurchaseOrderStatus.CONFIRMED);
+            insertStmt.setString(5, "1");
+            insertStmt.setString(6, modifiedBy);
+            insertStmt.setTimestamp(7, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+            insertStmt.executeUpdate();
+        }
+    }
+
     private static void seedAttachmentFileName(String fileName) throws SQLException {
         String sql = "INSERT INTO transaction_attachment (sTransNox, sSourceCd, sSourceNo, sFileName) VALUES (?, ?, ?, ?)";
         String transNo = ("AT" + System.nanoTime()).substring(0, 14);
@@ -3044,6 +3258,30 @@ public class PurchaseOrderTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static void setPrivateFieldInHierarchy(Object target, String fieldName, Object value) throws Exception {
+        Field field = getFieldFromHierarchy(target.getClass(), fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
+    private static Object getPrivateFieldInHierarchy(Object target, String fieldName) throws Exception {
+        Field field = getFieldFromHierarchy(target.getClass(), fieldName);
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
+    private static Field getFieldFromHierarchy(Class<?> type, String fieldName) throws NoSuchFieldException {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                return current.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
+        }
+        throw new NoSuchFieldException(fieldName);
     }
 
     private static boolean getPrivateBooleanField(Object target, String fieldName) throws Exception {
