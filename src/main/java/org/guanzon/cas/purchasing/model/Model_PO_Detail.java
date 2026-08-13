@@ -48,7 +48,7 @@ public class Model_PO_Detail extends Model {
     Model_Inv_Master poInventoryMaster;
     Model_PO_Quotation_Master poPOQuotationMaster;
     Model_PO_Quotation_Detail poPOQuotationDetail;
-
+    private String lsBrand ;
     @Override
     public void initialize() {
         try {
@@ -234,12 +234,21 @@ public class Model_PO_Detail extends Model {
         return (Date) getValue("dModified");
     }
 
-    public JSONObject setBrandId(String brandId) {
-        return poBrand.setBrandId(brandId);
+//    public JSONObject setBrandId(String brandId) {
+//        return poBrand.setBrandId(brandId);
+//    }
+//
+//    public String getBrandId() {
+//        return poBrand.getBrandId();
+//    }
+
+
+    public String setBrandId(String brandID) {
+        return lsBrand = brandID;
     }
 
     public String getBrandId() {
-        return poBrand.getBrandId();
+        return lsBrand;
     }
 
     public JSONObject setSourceEntryNo(Number entryNo) {
@@ -397,25 +406,43 @@ public class Model_PO_Detail extends Model {
         }
     }
 
-    public Model_Brand Brand() throws GuanzonException, SQLException {
-        if (!"".equals(getBrandId())) {
-//            if (poBrand.getEditMode() == EditMode.READY
-//                    && poBrand.getBrandId().equals(getBrandId())) {
+    public Model_Brand Brand() throws SQLException, GuanzonException {
+        if (!"".equals(lsBrand)) {
+            if (this.poBrand.getEditMode() == 1 && this.poBrand
+                    .getBrandId().equals(lsBrand)) {
+                return this.poBrand;
+            }
+            this.poJSON = this.poBrand.openRecord(this.getBrandId());
+            if ("success".equals(this.poJSON.get("result"))) {
+                return this.poBrand;
+            }
+            this.poBrand.initialize();
+            return this.poBrand;
+        }
+        this.poBrand.initialize();
+        return this.poBrand;
+    }
+
+//    public Model_Brand Brand() throws GuanzonException, SQLException {
+//        System.out.println("brandID" + getBrandId());
+//        if (!"".equals(getBrandId())) {
+////            if (poBrand.getEditMode() == EditMode.READY
+////                    && poBrand.getBrandId().equals(getBrandId())) {
+////                return poBrand;
+////            } else {
+//            poJSON = poBrand.openRecord(getBrandId());
+//            if ("success".equals((String) poJSON.get("result"))) {
 //                return poBrand;
 //            } else {
-            poJSON = poBrand.openRecord(getBrandId());
-            if ("success".equals((String) poJSON.get("result"))) {
-                return poBrand;
-            } else {
-                poBrand.initialize();
-                return poBrand;
-            }
+//                poBrand.initialize();
+//                return poBrand;
 //            }
-        } else {
-            poBrand.initialize();
-            return poBrand;
-        }
-    }
+////            }
+//        } else {
+//            poBrand.initialize();
+//            return poBrand;
+//        }
+//    }
 
 //    public Model_Brand Brand() throws GuanzonException, SQLException {
 //        if (!"".equals((String) getValue("sBrandIDx"))) {

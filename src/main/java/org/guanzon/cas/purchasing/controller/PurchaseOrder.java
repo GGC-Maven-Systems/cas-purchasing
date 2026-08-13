@@ -2694,9 +2694,8 @@ public class PurchaseOrder extends Transaction {
         brand.setRecordStatus(RecordStatus.ACTIVE);
 
         poJSON = brand.searchRecord(value, byCode, Master().getIndustryID());
-
         if ("success".equals((String) poJSON.get("result"))) {
-            Detail(row).setBrandId(brand.getModel().getBrandId());
+            Detail(row).setBrandId((String) poJSON.get("sBrandIDx"));
         }
 
         return poJSON;
@@ -2733,12 +2732,16 @@ public class PurchaseOrder extends Transaction {
                     }
                 }
             }
+            Detail(row).setBrandId(object.getModel().getBrandId());
             Detail(row).setStockID(object.getModel().getStockId());
             Detail(row).setUnitPrice(object.getModel().getCost().doubleValue());
             Detail(row).setOldPrice(object.getModel().getCost().doubleValue());
+
         }
         return poJSON;
     }
+
+
 
     private String getInvStockRequest_SQL() {
         return "SELECT"
