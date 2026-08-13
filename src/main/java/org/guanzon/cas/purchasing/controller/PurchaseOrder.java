@@ -105,6 +105,7 @@ import ph.com.guanzongroup.cas.cashflow.services.CashflowControllers;
 import org.guanzon.cas.purchasing.services.QuotationControllers;
 import org.guanzon.cas.purchasing.status.POQuotationStatus;
 import org.json.simple.parser.JSONParser;
+import ph.com.guanzongroup.cas.cashflow.utility.CustomCommonUtil;
 
 public class PurchaseOrder extends Transaction {
 
@@ -3372,6 +3373,7 @@ public class PurchaseOrder extends Transaction {
             return poJSON;
         }
         double lnTotalAmount = Master().getTranTotal().doubleValue() - ((Master().getDiscount().doubleValue() / 100) * Master().getTranTotal().doubleValue());
+        lnTotalAmount = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(lnTotalAmount, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if (lnTotalAmount == PurchaseOrderStaticData.default_value_double) {
             poJSON.put("message", "You're not allowed to enter discount amount, no amount entered.");
             poJSON.put("result", "error");
@@ -3408,6 +3410,7 @@ public class PurchaseOrder extends Transaction {
             fsValue = "0.00";
         }
         double amountAfterDiscounts = Master().getTranTotal().doubleValue() - (((Master().getTranTotal().doubleValue() / 100) * Master().getDiscount().doubleValue()) + Master().getAdditionalDiscount().doubleValue());
+        amountAfterDiscounts = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(amountAfterDiscounts, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if (amountAfterDiscounts <= PurchaseOrderStaticData.default_value_double) {
             poJSON.put("message", "Invalid Advance Payment Rate, the total transaction amount is 0.0000");
             poJSON.put("result", "error");
@@ -3427,6 +3430,7 @@ public class PurchaseOrder extends Transaction {
         
         //Added validation for total downpayment Arsiela 07-15-2026
         double ldblTotalAdvPayment = ((amountAfterDiscounts/100) * lnAdvanceRate) + Master().getDownPaymentRatesAmount().doubleValue();
+        ldblTotalAdvPayment = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(ldblTotalAdvPayment, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if(ldblTotalAdvPayment > amountAfterDiscounts){
             poJSON.put("result", "error");
             poJSON.put("message", "Invalid Downpayment Total.");
@@ -3460,7 +3464,7 @@ public class PurchaseOrder extends Transaction {
 
         //Replace by the computation above Arsiela 07-15-2026
         double amountAfterDiscounts = Master().getTranTotal().doubleValue() - (((Master().getTranTotal().doubleValue() / 100) * Master().getDiscount().doubleValue()) + Master().getAdditionalDiscount().doubleValue());
-        
+        amountAfterDiscounts = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(amountAfterDiscounts, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if (amountAfterDiscounts <= PurchaseOrderStaticData.default_value_double) {
             poJSON.put("message", "Invalid Advance Payment Amount, the total transaction amount is 0.0000");
             poJSON.put("result", "error");
@@ -3479,6 +3483,7 @@ public class PurchaseOrder extends Transaction {
         }
         
         double ldblTotalAdvPayment = ((amountAfterDiscounts/100) * Master().getDownPaymentRatesPercentage().doubleValue()) + lnAdvanceAmount ; //Added validation for total downpayment Arsiela 07-15-2026
+        ldblTotalAdvPayment = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(ldblTotalAdvPayment, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if(ldblTotalAdvPayment > amountAfterDiscounts){
             poJSON.put("result", "error");
             poJSON.put("message", "Invalid Downpayment Total.");
@@ -3529,6 +3534,7 @@ public class PurchaseOrder extends Transaction {
     public JSONObject netTotalChecker(int pnRow) {
         poJSON = new JSONObject();
         double NetTotl = Master().getNetTotal().doubleValue() + (Detail(pnRow).getQuantity().doubleValue() * Detail(pnRow).getUnitPrice().doubleValue());
+        NetTotl = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(NetTotl, true).replace(",", "")); //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if (NetTotl >= 100000000.0000) {
             poJSON.put("result", "error");
             poJSON.put("message", "The net total exceeds the maximum allowed amount. Please reduce the value and try again.");
