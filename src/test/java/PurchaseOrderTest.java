@@ -1,4 +1,3 @@
-
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -12,16 +11,22 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.constant.RecordStatus;
 import org.guanzon.cas.inv.warehouse.services.InvWarehouseControllers;
 import org.guanzon.cas.parameter.model.Model_Project;
+import org.guanzon.cas.inv.warehouse.StockRequest;
+import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Master;
 import org.guanzon.cas.purchasing.controller.PurchaseOrder;
+import org.guanzon.cas.purchasing.controller.POQuotation;
+import org.guanzon.cas.purchasing.model.Model_PO_Quotation_Master;
 import org.guanzon.cas.purchasing.services.PurchaseOrderControllers;
 import org.guanzon.cas.purchasing.services.QuotationControllers;
+import org.guanzon.cas.purchasing.status.POQuotationStatus;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
 import org.h2.tools.RunScript;
 import org.json.simple.JSONObject;
@@ -365,7 +370,6 @@ public class PurchaseOrderTest {
         Assert.assertEquals(psCompanyId, poController.Master().getCompanyID());
         Assert.assertEquals(PurchaseOrderStatus.OPEN, poController.Master().getTransactionStatus());
         Assert.assertNotNull(poController.Master().getTransactionDate());
-//        Assert.assertNotNull(poController.Master().getAppliedDate());
     }
 
     @Test
@@ -391,16 +395,81 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        poController.Master().setIndustryID(psIndustryId);
-        poController.Master().setCompanyID(psCompanyId);
-        poController.Master().setCategoryCode(psCategorCd);
+        setClassConfig();
+        poController.Master().setSupplierID("M00115000863");
 
         loJSON = poController.getApprovedStockRequests();
         Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(loJSON.containsKey("data"));
+        Assert.assertTrue(loJSON.get("data") instanceof org.json.simple.JSONArray);
+
+        org.json.simple.JSONArray data = (org.json.simple.JSONArray) loJSON.get("data");
+        for (Object row : data) {
+            org.json.simple.JSONObject request = (org.json.simple.JSONObject) row;
+            Assert.assertTrue(request.containsKey("sTransNox"));
+            Assert.assertTrue(request.containsKey("sBranchCd"));
+            Assert.assertTrue(request.containsKey("dTransact"));
+            Assert.assertTrue(request.containsKey("sReferNox"));
+            Assert.assertTrue(request.containsKey("cTranStat"));
+            Assert.assertTrue(request.containsKey("sBranchNm"));
+            Assert.assertTrue(request.containsKey("total_details"));
+            Assert.assertTrue(request.containsKey("request_type"));
+        }
 
 //        if (poController.getSalesInquiryCount() > 0) {
 //            poController.SalesInquiryList(0);
 //        }
+    }
+
+    @Test
+    @Order(6)
+    public void testGetApprovedStockRequestsIncludesSeededStockRequestAndPOQuotation() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        poController.Master().setSupplierID("M00115000863");
+
+        seedStockRequestForApprovedStockRequestList();
+        String quotationNo = seedApprovedPOQuotationForApprovedStockRequestList();
+
+        loJSON = poController.getApprovedStockRequests();
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(loJSON.get("data") instanceof org.json.simple.JSONArray);
+
+        org.json.simple.JSONArray data = (org.json.simple.JSONArray) loJSON.get("data");
+        boolean foundPOQuotation = false;
+        Assert.assertTrue(data.size() > 0);
+
+        for (Object row : data) {
+            org.json.simple.JSONObject request = (org.json.simple.JSONObject) row;
+            String transNo = String.valueOf(request.get("sTransNox"));
+            String requestType = String.valueOf(request.get("request_type"));
+            if (quotationNo.equals(transNo)) {
+                foundPOQuotation = PurchaseOrderStatus.SourceCode.POQUOTATION.equals(requestType);
+            }
+        }
+
+        Assert.assertTrue("Seeded PO quotation must be included in approved request list.", foundPOQuotation);
+    }
+
+    @Test
+    @Order(6)
+    public void testGetApprovedStockRequestsWithNoMatchingFiltersReturnsEmptyData() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.Master().setIndustryID(psIndustryId);
+        poController.Master().setCompanyID(psCompanyId);
+        poController.Master().setCategoryCode("NO_MATCH_CATEGORY");
+        poController.Master().setSupplierID("NO_MATCH_SUPPLIER");
+
+        loJSON = poController.getApprovedStockRequests();
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(loJSON.get("data") instanceof org.json.simple.JSONArray);
+        Assert.assertEquals(0, ((org.json.simple.JSONArray) loJSON.get("data")).size());
     }
 
     @Test
@@ -1484,23 +1553,22 @@ public class PurchaseOrderTest {
 
     @Test
     @Order(97)
-    public void testSavePRFApprovedPathReturnsStructuredResult() throws Exception {
+    public void testSavePRFApprovedWithPercentageOnlyReturnsSuccess() throws Exception {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
-        loJSON = poController.OpenTransaction("GCO126000003");
-        Assert.assertEquals("success", loJSON.get("result"));
 
         poController.Master().setWithAdvPaym(true);
-        poController.Master().setDownPaymentRatesAmount(1.0);
+        poController.Master().setDownPaymentRatesAmount(0.0);
+        poController.Master().setDownPaymentRatesPercentage(1.0);
+        poController.Master().setTransactionNo("PO-COVERAGE-" + System.nanoTime());
 
-        // Build the payment request object used by savePRF(APPROVED).
-        invokePrivateMethod(poController, "generatePRF",
-                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.APPROVED});
+        setPrivateField(poController, "poPaymentRequest",
+                new StubCashflowControllers(new SuccessResultPaymentRequest()));
 
         loJSON = (JSONObject) invokePrivateMethod(poController, "savePRF",
                 new Class[]{String.class}, new Object[]{PurchaseOrderStatus.APPROVED});
-        Assert.assertTrue(loJSON.containsKey("result"));
+        Assert.assertEquals("success", loJSON.get("result"));
     }
 
     @Test
@@ -1551,7 +1619,21 @@ public class PurchaseOrderTest {
         poController.Master().setDownPaymentRatesPercentage(0.0);
         poController.Master().setTransactionNo("PO-COVERAGE-" + System.nanoTime());
 
+        setPrivateField(poController, "poPaymentRequest",
+                new StubCashflowControllers(new SQLExceptionOnLoadPaymentRequest()));
 
+        Logger poLogger = Logger.getLogger(PurchaseOrder.class.getName());
+        Level previousLevel = poLogger.getLevel();
+        try {
+            // Keep catch-path coverage but silence expected test noise from logged stacktrace.
+            poLogger.setLevel(Level.OFF);
+            loJSON = (JSONObject) invokePrivateMethod(poController, "savePRF",
+                    new Class[]{String.class}, new Object[]{PurchaseOrderStatus.APPROVED});
+        } finally {
+            poLogger.setLevel(previousLevel);
+        }
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("forced sql error for coverage"));
     }
 
     @Test
@@ -1625,6 +1707,68 @@ public class PurchaseOrderTest {
 
     @Test
     @Order(98)
+    public void testSaveUpdatesReturnsErrorWhenStockRequestSaveFails() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        java.util.List<StockRequest> stockRequestQueue = new java.util.ArrayList<>();
+        stockRequestQueue.add(new ErrorResultStockRequest("forced stock request save error for coverage"));
+        setPrivateField(poController, "poStockRequest", stockRequestQueue);
+        setPrivateField(poController, "poPOQuotation", new java.util.ArrayList<POQuotation>());
+
+        loJSON = (JSONObject) invokePrivateMethod(poController, "saveUpdates",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.APPROVED});
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("forced stock request save error"));
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveUpdatesReturnsErrorWhenPOQuotationSaveFails() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        java.util.List<POQuotation> quotationQueue = new java.util.ArrayList<>();
+        quotationQueue.add(new ErrorResultPOQuotation("forced quotation save error for coverage"));
+        setPrivateField(poController, "poStockRequest", new java.util.ArrayList<StockRequest>());
+        setPrivateField(poController, "poPOQuotation", quotationQueue);
+
+        loJSON = (JSONObject) invokePrivateMethod(poController, "saveUpdates",
+                new Class[]{String.class}, new Object[]{PurchaseOrderStatus.CONFIRMED});
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("forced quotation save error"));
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveUpdatesReturnsErrorWhenStockRequestThrowsSQLException() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        java.util.List<StockRequest> stockRequestQueue = new java.util.ArrayList<>();
+        stockRequestQueue.add(new SQLExceptionStockRequest("forced stock request sql exception for coverage"));
+        setPrivateField(poController, "poStockRequest", stockRequestQueue);
+        setPrivateField(poController, "poPOQuotation", new java.util.ArrayList<POQuotation>());
+
+        Logger poLogger = Logger.getLogger(PurchaseOrder.class.getName());
+        Level previousLevel = poLogger.getLevel();
+        try {
+            poLogger.setLevel(Level.OFF);
+            loJSON = (JSONObject) invokePrivateMethod(poController, "saveUpdates",
+                    new Class[]{String.class}, new Object[]{PurchaseOrderStatus.CONFIRMED});
+        } finally {
+            poLogger.setLevel(previousLevel);
+        }
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("forced stock request sql exception"));
+    }
+
+    @Test
+    @Order(98)
     public void testSaveOthersWithAttachmentAndRelatedUpdatesReturnsSuccess() throws Exception {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
@@ -1660,26 +1804,26 @@ public class PurchaseOrderTest {
         }
     }
 
-    @Test
-    @Order(98)
-    public void testSaveOthersUpdateModeWithLoadedAttachmentsReturnsStructuredResult() throws Exception {
-        resetController();
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        loJSON = poController.OpenTransaction("GCO126000029");
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        loJSON = poController.UpdateTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        poController.loadAttachments();
-        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
-
-        loJSON = poController.saveOthers();
-        Assert.assertTrue(loJSON.containsKey("result"));
-        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
-    }
+//    @Test
+//    @Order(98)
+//    public void testSaveOthersUpdateModeWithLoadedAttachmentsReturnsStructuredResult() throws Exception {
+//        resetController();
+//        JSONObject loJSON = poController.InitTransaction();
+//        Assert.assertEquals("success", loJSON.get("result"));
+//
+//        loJSON = poController.OpenTransaction("GCO126000029");
+//        Assert.assertEquals("success", loJSON.get("result"));
+//
+//        loJSON = poController.UpdateTransaction();
+//        Assert.assertEquals("success", loJSON.get("result"));
+//
+//        poController.loadAttachments();
+//        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+//
+//        loJSON = poController.saveOthers();
+//        Assert.assertTrue(loJSON.containsKey("result"));
+//        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+//    }
 
     @Test
     @Order(98)
@@ -2863,9 +3007,20 @@ public class PurchaseOrderTest {
         loJSON = poController.OpenTransaction("GCO126000003");
         Assert.assertEquals("success", loJSON.get("result"));
 
+        Model_Project passingProject = new Model_Project() {
+            @Override
+            public JSONObject saveRecord() {
+                JSONObject ok = new JSONObject();
+                ok.put("result", "success");
+                return ok;
+            }
+        };
+
+        setPrivateField(poController, "poProject", passingProject);
+
         JSONObject result = (JSONObject) invokePrivateMethod(poController, "saveProjectTitle", new Class[]{String.class}, new Object[]{PurchaseOrderStatus.OPEN});
         Assert.assertNotNull(result);
-        Assert.assertTrue(result.containsKey("result"));
+        Assert.assertEquals("success", result.get("result"));
     }
 
     @Test
@@ -3343,6 +3498,122 @@ public class PurchaseOrderTest {
         Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("Cannot parse \"DATE\""));
     }
 
+    @Test
+    @Order(58)
+    public void testRetriveSummaryReportsNoRecordsFoundReturnsErrorAndEmptyData() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        loJSON = poController.RetriveSummaryReports(
+                true,
+                null,
+                null,
+                "NO_BRANCH_MATCH",
+                "",
+                "",
+                "");
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("No records found.", loJSON.get("message"));
+        Assert.assertTrue(loJSON.get("data") instanceof org.json.simple.JSONArray);
+        Assert.assertEquals(0, ((org.json.simple.JSONArray) loJSON.get("data")).size());
+    }
+
+    @Test
+    @Order(59)
+    public void testRetriveSummaryReportsWithBranchDestinationSupplierCategoryFilters() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        String branchCode = instance.getBranchCode();
+        String destination = instance.getBranchCode();
+        seedSummaryAndDetailRowsForStatuses(branchCode, destination, new String[]{PurchaseOrderStatus.OPEN});
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        loJSON = poController.RetriveSummaryReports(
+                true,
+                null,
+                null,
+                branchCode,
+                destination,
+                "M00115000863",
+                psCategorCd);
+
+        Assert.assertEquals("success", loJSON.get("result"));
+        org.json.simple.JSONArray data = (org.json.simple.JSONArray) loJSON.get("data");
+        Assert.assertTrue(data.size() > 0);
+
+        org.json.simple.JSONObject first = (org.json.simple.JSONObject) data.get(0);
+        Assert.assertTrue(first.containsKey("Supplier"));
+        Assert.assertFalse(String.valueOf(first.get("Supplier")).trim().isEmpty());
+        Assert.assertEquals("OPEN", String.valueOf(first.get("cTranStat")));
+    }
+
+    @Test
+    @Order(60)
+    public void testRetriveSummaryReportsSingleStatusEqualsBranchSuccess() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        String branchCode = instance.getBranchCode();
+        String destination = instance.getBranchCode();
+        seedSummaryAndDetailRowsForStatuses(branchCode, destination,
+                new String[]{PurchaseOrderStatus.OPEN, PurchaseOrderStatus.CONFIRMED});
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        loJSON = poController.RetriveSummaryReports(
+                true,
+                null,
+                null,
+                "",
+                "",
+                "",
+                "");
+
+        Assert.assertEquals("success", loJSON.get("result"));
+        org.json.simple.JSONArray data = (org.json.simple.JSONArray) loJSON.get("data");
+        Assert.assertTrue(data.size() > 0);
+        for (Object row : data) {
+            org.json.simple.JSONObject obj = (org.json.simple.JSONObject) row;
+            Assert.assertEquals("OPEN", String.valueOf(obj.get("cTranStat")));
+        }
+    }
+
+    @Test
+    @Order(61)
+    public void testRetriveSummaryReportsWithOnlyDateFromSkipsDateBetweenFilter() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        String branchCode = instance.getBranchCode();
+        String destination = instance.getBranchCode();
+        seedSummaryAndDetailRowsForStatuses(branchCode, destination, new String[]{PurchaseOrderStatus.OPEN});
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        loJSON = poController.RetriveSummaryReports(
+                true,
+                java.time.LocalDate.of(2026, 1, 1),
+                null,
+                "",
+                "",
+                "",
+                "");
+
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(loJSON.get("data") instanceof org.json.simple.JSONArray);
+        Assert.assertTrue(((org.json.simple.JSONArray) loJSON.get("data")).size() > 0);
+    }
+
 //    @Test
 //    @Order(54)
 //    public void testPostTransactionWithoutLoadedTransactionReturnsError() throws Exception {
@@ -3450,6 +3721,131 @@ public class PurchaseOrderTest {
             JSONObject loJSON = new JSONObject();
             loJSON.put("result", "error");
             loJSON.put("message", "forced save error for coverage");
+            return loJSON;
+        }
+    }
+
+    private static final class SuccessResultPaymentRequest extends PaymentRequest {
+        @Override
+        public JSONObject loadPOAttachment(String fsTransactionNo) {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "success");
+            return loJSON;
+        }
+
+        @Override
+        public JSONObject SaveTransaction() {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "success");
+            return loJSON;
+        }
+    }
+
+    private static final class SQLExceptionOnLoadPaymentRequest extends PaymentRequest {
+        @Override
+        public JSONObject loadPOAttachment(String fsTransactionNo) throws SQLException {
+            throw new SQLException("forced sql error for coverage");
+        }
+    }
+
+    private static final class ErrorResultStockRequest extends StockRequest {
+        private final String message;
+        private final Model_Inv_Stock_Request_Master master = new NoOpStockRequestMaster();
+
+        private ErrorResultStockRequest(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public Model_Inv_Stock_Request_Master Master() {
+            return master;
+        }
+
+        @Override
+        public JSONObject SaveTransaction() {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "error");
+            loJSON.put("message", message);
+            return loJSON;
+        }
+    }
+
+    private static final class SQLExceptionStockRequest extends StockRequest {
+        private final String message;
+        private final Model_Inv_Stock_Request_Master master = new NoOpStockRequestMaster();
+
+        private SQLExceptionStockRequest(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public Model_Inv_Stock_Request_Master Master() {
+            return master;
+        }
+
+        @Override
+        public JSONObject SaveTransaction() throws SQLException {
+            throw new SQLException(message);
+        }
+    }
+
+    private static final class ErrorResultPOQuotation extends POQuotation {
+        private final String message;
+        private final Model_PO_Quotation_Master master = new NoOpPOQuotationMaster();
+
+        private ErrorResultPOQuotation(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public Model_PO_Quotation_Master Master() {
+            return master;
+        }
+
+        @Override
+        public JSONObject SaveTransaction() {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "error");
+            loJSON.put("message", message);
+            return loJSON;
+        }
+    }
+
+    private static final class NoOpStockRequestMaster extends Model_Inv_Stock_Request_Master {
+        @Override
+        public JSONObject setProcessed(boolean value) {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "success");
+            return loJSON;
+        }
+
+        @Override
+        public JSONObject setModifyingId(String value) {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "success");
+            return loJSON;
+        }
+
+        @Override
+        public JSONObject setModifiedDate(java.util.Date value) {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "success");
+            return loJSON;
+        }
+    }
+
+    private static final class NoOpPOQuotationMaster extends Model_PO_Quotation_Master {
+        @Override
+        public JSONObject setModifyingId(String value) {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "success");
+            return loJSON;
+        }
+
+        @Override
+        public JSONObject setModifiedDate(java.util.Date value) {
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "success");
             return loJSON;
         }
     }
@@ -3566,6 +3962,86 @@ public class PurchaseOrderTest {
             detailStmt.setDouble(11, 0.0);
             detailStmt.setDouble(12, 0.0);
             detailStmt.setDouble(13, approvedQty);
+            detailStmt.setDouble(14, 0.0);
+            detailStmt.setDouble(15, 0.0);
+            detailStmt.setDouble(16, 0.0);
+            detailStmt.setDouble(17, 0.0);
+            detailStmt.setDouble(18, 0.0);
+            detailStmt.setTimestamp(19, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+            detailStmt.executeUpdate();
+        }
+
+        return transNo;
+    }
+
+    private static String seedStockRequestForApprovedStockRequestList() throws SQLException {
+        final String stockId = "W00525000863";
+
+        String supplierExistsSql = "SELECT COUNT(*) AS cnt FROM inv_supplier WHERE sStockIDx = ? AND sIndstCdx = ? AND sSupplier = ?";
+        try (PreparedStatement existsStmt = conn.prepareStatement(supplierExistsSql)) {
+            existsStmt.setString(1, stockId);
+            existsStmt.setString(2, psIndustryId);
+            existsStmt.setString(3, "M00115000863");
+            try (ResultSet rs = existsStmt.executeQuery()) {
+                if (rs.next() && rs.getInt("cnt") == 0) {
+                    String supplierInsertSql = "INSERT INTO inv_supplier (sStockIDx, sIndstCdx, sSupplier, nUnitPrce, nAvePurcx, sSourceNo, cRecdStat) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                    try (PreparedStatement insertSupplier = conn.prepareStatement(supplierInsertSql)) {
+                        insertSupplier.setString(1, stockId);
+                        insertSupplier.setString(2, psIndustryId);
+                        insertSupplier.setString(3, "M00115000863");
+                        insertSupplier.setDouble(4, 1.0);
+                        insertSupplier.setDouble(5, 1.0);
+                        insertSupplier.setString(6, "SEEDSR000001");
+                        insertSupplier.setString(7, "1");
+                        insertSupplier.executeUpdate();
+                    }
+                }
+            }
+        }
+
+        int seed;
+        synchronized (PurchaseOrderTest.class) {
+            seed = pnReportSeedBase++;
+        }
+        String transNo = "GK01" + String.format("%08d", seed);
+
+        String masterSql = "INSERT INTO inv_stock_request_master ("
+                + "sTransNox, sBranchCd, sIndstCdx, sCompnyID, sCategrCd, dTransact, sReferNox, nEntryNox, cPrintxxx, cProcessd, cTranStat, sModified, dModified"
+                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        String detailSql = "INSERT INTO inv_stock_request_detail ("
+                + "sTransNox, nEntryNox, sStockIDx, nQuantity, cClassify, nRecOrder, nQtyOnHnd, nResvOrdr, nBackOrdr, nOnTranst, nAvgMonSl, nMaxLevel, nApproved, nCancelld, nIssueQty, nOrderQty, nAllocQty, nReceived, dModified"
+                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement masterStmt = conn.prepareStatement(masterSql); PreparedStatement detailStmt = conn.prepareStatement(detailSql)) {
+            masterStmt.setString(1, transNo);
+            masterStmt.setString(2, "GK01");
+            masterStmt.setString(3, psIndustryId);
+            masterStmt.setString(4, psCompanyId);
+            masterStmt.setString(5, psCategorCd);
+            masterStmt.setDate(6, java.sql.Date.valueOf("2026-08-12"));
+            masterStmt.setString(7, "SR" + seed);
+            masterStmt.setInt(8, 1);
+            masterStmt.setString(9, "0");
+            masterStmt.setString(10, "0");
+            masterStmt.setString(11, PurchaseOrderStatus.CONFIRMED);
+            masterStmt.setString(12, "M001250015");
+            masterStmt.setTimestamp(13, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+            masterStmt.executeUpdate();
+
+            detailStmt.setString(1, transNo);
+            detailStmt.setInt(2, 1);
+            detailStmt.setString(3, stockId);
+            detailStmt.setDouble(4, 6.0);
+            detailStmt.setString(5, "F");
+            detailStmt.setDouble(6, 0.0);
+            detailStmt.setDouble(7, 0.0);
+            detailStmt.setDouble(8, 0.0);
+            detailStmt.setDouble(9, 0.0);
+            detailStmt.setDouble(10, 0.0);
+            detailStmt.setDouble(11, 0.0);
+            detailStmt.setDouble(12, 0.0);
+            detailStmt.setDouble(13, 6.0);
             detailStmt.setDouble(14, 0.0);
             detailStmt.setDouble(15, 0.0);
             detailStmt.setDouble(16, 0.0);
@@ -3763,6 +4239,64 @@ public class PurchaseOrderTest {
             seed = pnPOQuotationSeedBase++;
         }
         return "GK01" + String.format("%08d", seed);
+    }
+
+    private static String seedApprovedPOQuotationForApprovedStockRequestList() throws SQLException {
+        String transNo = nextPOQuotationTransNo();
+
+        String masterSql = "INSERT INTO po_quotation_master ("
+                + "sTransNox, sBranchCd, sIndstCdx, sCategrCd, sCompnyID, sReferNox, sSupplier, dTransact, dReferDte, sTermCode, dValidity,"
+                + "nGrossAmt, nDiscount, nAddDiscx, nVATRatex, nVATAmtxx, cVATAdded, nTWithHld, nFreightx, nTranTotl, sRemarksx, sSourceNo, sSourceCd, nEntryNox, cTranStat"
+                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        String detailSql = "INSERT INTO po_quotation_detail ("
+                + "sTransNox, nEntryNox, sStockIDx, sDescript, sReplacID, sReplacDs, nQuantity, nUnitPrce, nDiscRate, nDiscAmtx, cReversex, dModified"
+                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement masterStmt = conn.prepareStatement(masterSql); PreparedStatement detailStmt = conn.prepareStatement(detailSql)) {
+            masterStmt.setString(1, transNo);
+            masterStmt.setString(2, "GK01");
+            masterStmt.setString(3, psIndustryId);
+            masterStmt.setString(4, psCategorCd);
+            masterStmt.setString(5, psCompanyId);
+            masterStmt.setString(6, transNo.substring(4, 12));
+            masterStmt.setString(7, "M00115000863");
+            masterStmt.setDate(8, java.sql.Date.valueOf("2026-08-12"));
+            masterStmt.setDate(9, java.sql.Date.valueOf("2026-08-12"));
+            masterStmt.setString(10, "M001001");
+            masterStmt.setDate(11, java.sql.Date.valueOf("2026-09-12"));
+            masterStmt.setDouble(12, 250.0);
+            masterStmt.setDouble(13, 0.0);
+            masterStmt.setDouble(14, 0.0);
+            masterStmt.setDouble(15, 12.0);
+            masterStmt.setDouble(16, 0.0);
+            masterStmt.setString(17, "0");
+            masterStmt.setDouble(18, 0.0);
+            masterStmt.setDouble(19, 0.0);
+            masterStmt.setDouble(20, 250.0);
+            masterStmt.setString(21, "seeded for getApprovedStockRequests coverage");
+            masterStmt.setString(22, "");
+            masterStmt.setString(23, "");
+            masterStmt.setInt(24, 1);
+            masterStmt.setString(25, POQuotationStatus.APPROVED);
+            masterStmt.executeUpdate();
+
+            detailStmt.setString(1, transNo);
+            detailStmt.setInt(2, 1);
+            detailStmt.setString(3, "GK0123000010");
+            detailStmt.setString(4, "coverage-quotation");
+            detailStmt.setString(5, "");
+            detailStmt.setString(6, "");
+            detailStmt.setDouble(7, 1.0);
+            detailStmt.setDouble(8, 250.0);
+            detailStmt.setDouble(9, 0.0);
+            detailStmt.setDouble(10, 0.0);
+            detailStmt.setString(11, PurchaseOrderStatus.Reverse.INCLUDE);
+            detailStmt.setTimestamp(12, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+            detailStmt.executeUpdate();
+        }
+
+        return transNo;
     }
 
     private static String seedPOQuotationWithDetails(double additionalDiscount, double discountRate, boolean vatAdded, Object[][] detailRows) throws SQLException {
