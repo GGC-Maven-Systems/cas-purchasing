@@ -30,8 +30,16 @@ import java.util.logging.Logger;
 import javafx.application.Platform;
 import javax.sql.rowset.CachedRowSet;
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
+
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.export.HtmlExporter;
+import net.sf.jasperreports.engine.export.JRCsvExporter;
+import net.sf.jasperreports.engine.export.ooxml.JRDocxExporter;
+import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
+import net.sf.jasperreports.engine.xml.JRXmlWriter;
+import net.sf.jasperreports.export.*;
 import net.sf.jasperreports.swing.JRViewer;
 import net.sf.jasperreports.swing.JRViewerToolbar;
 import net.sf.jasperreports.view.JasperViewer;
@@ -57,10 +65,13 @@ import org.guanzon.appdriver.constant.UserRight;
 import org.guanzon.appdriver.iface.GValidator;
 import org.guanzon.appdriver.token.RequestAccess;
 import org.guanzon.cas.client.account.AP_Client_Master;
+import org.guanzon.cas.client.model.Model_Client_Master;
 import org.guanzon.cas.client.services.ClientControllers;
+import org.guanzon.cas.client.services.ClientModels;
 import org.guanzon.cas.inv.InvTransCons;
 import org.guanzon.cas.inv.Inventory;
 import org.guanzon.cas.inv.InventoryTransaction;
+//import org.guanzon.cas.inv.Inventory;
 import org.guanzon.cas.inv.services.InvControllers;
 import org.guanzon.cas.inv.warehouse.StockRequest;
 import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Master;
@@ -81,18 +92,20 @@ import org.guanzon.cas.purchasing.model.Model_PO_Detail;
 import org.guanzon.cas.purchasing.model.Model_PO_Master;
 import org.guanzon.cas.purchasing.services.PurchaseOrderControllers;
 import org.guanzon.cas.purchasing.services.PurchaseOrderModels;
-import org.guanzon.cas.purchasing.services.QuotationControllers;
-import org.guanzon.cas.purchasing.status.POQuotationStatus;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStaticData;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
 import org.guanzon.cas.purchasing.utility.CustomJasperViewerReports;
 import org.guanzon.cas.purchasing.validator.PurchaseOrderValidatorFactory;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import ph.com.guanzongroup.cas.cashflow.DisbursementVoucher;
 import ph.com.guanzongroup.cas.cashflow.Payee;
 import ph.com.guanzongroup.cas.cashflow.services.CashflowControllers;
+import org.guanzon.cas.purchasing.services.QuotationControllers;
+import org.guanzon.cas.purchasing.status.POQuotationStatus;
+import org.json.simple.parser.JSONParser;
+import ph.com.guanzongroup.cas.cashflow.utility.CustomCommonUtil;
 
 public class PurchaseOrder extends Transaction {
 
@@ -2682,9 +2695,8 @@ public class PurchaseOrder extends Transaction {
         brand.setRecordStatus(RecordStatus.ACTIVE);
 
         poJSON = brand.searchRecord(value, byCode, Master().getIndustryID());
-
         if ("success".equals((String) poJSON.get("result"))) {
-            Detail(row).setBrandId(brand.getModel().getBrandId());
+            Detail(row).setBrandId((String) poJSON.get("sBrandIDx"));
         }
 
         return poJSON;
@@ -2721,12 +2733,16 @@ public class PurchaseOrder extends Transaction {
                     }
                 }
             }
+            Detail(row).setBrandId(object.getModel().getBrandId());
             Detail(row).setStockID(object.getModel().getStockId());
             Detail(row).setUnitPrice(object.getModel().getCost().doubleValue());
             Detail(row).setOldPrice(object.getModel().getCost().doubleValue());
+
         }
         return poJSON;
     }
+
+
 
     private String getInvStockRequest_SQL() {
         return "SELECT"
@@ -3313,7 +3329,7 @@ public class PurchaseOrder extends Transaction {
         if (fsValue == null || fsValue.isEmpty()) {
             fsValue = "0.0000";
         }
-        double lnTotalAmount = Master().getTranTotal().doubleValue();
+        double lnTotalAmount = (double) Master().getTranTotal();
         if (lnTotalAmount == 0.0000) {
             poJSON.put("message", "You're not allowed to enter discount rate, no detail amount entered.");
             poJSON.put("result", "error");
@@ -3357,6 +3373,7 @@ public class PurchaseOrder extends Transaction {
             return poJSON;
         }
         double lnTotalAmount = Master().getTranTotal().doubleValue() - ((Master().getDiscount().doubleValue() / 100) * Master().getTranTotal().doubleValue());
+        lnTotalAmount = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(lnTotalAmount, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if (lnTotalAmount == PurchaseOrderStaticData.default_value_double) {
             poJSON.put("message", "You're not allowed to enter discount amount, no amount entered.");
             poJSON.put("result", "error");
@@ -3393,6 +3410,7 @@ public class PurchaseOrder extends Transaction {
             fsValue = "0.00";
         }
         double amountAfterDiscounts = Master().getTranTotal().doubleValue() - (((Master().getTranTotal().doubleValue() / 100) * Master().getDiscount().doubleValue()) + Master().getAdditionalDiscount().doubleValue());
+        amountAfterDiscounts = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(amountAfterDiscounts, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if (amountAfterDiscounts <= PurchaseOrderStaticData.default_value_double) {
             poJSON.put("message", "Invalid Advance Payment Rate, the total transaction amount is 0.0000");
             poJSON.put("result", "error");
@@ -3412,6 +3430,7 @@ public class PurchaseOrder extends Transaction {
         
         //Added validation for total downpayment Arsiela 07-15-2026
         double ldblTotalAdvPayment = ((amountAfterDiscounts/100) * lnAdvanceRate) + Master().getDownPaymentRatesAmount().doubleValue();
+        ldblTotalAdvPayment = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(ldblTotalAdvPayment, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if(ldblTotalAdvPayment > amountAfterDiscounts){
             poJSON.put("result", "error");
             poJSON.put("message", "Invalid Downpayment Total.");
@@ -3445,7 +3464,7 @@ public class PurchaseOrder extends Transaction {
 
         //Replace by the computation above Arsiela 07-15-2026
         double amountAfterDiscounts = Master().getTranTotal().doubleValue() - (((Master().getTranTotal().doubleValue() / 100) * Master().getDiscount().doubleValue()) + Master().getAdditionalDiscount().doubleValue());
-        
+        amountAfterDiscounts = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(amountAfterDiscounts, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if (amountAfterDiscounts <= PurchaseOrderStaticData.default_value_double) {
             poJSON.put("message", "Invalid Advance Payment Amount, the total transaction amount is 0.0000");
             poJSON.put("result", "error");
@@ -3464,6 +3483,7 @@ public class PurchaseOrder extends Transaction {
         }
         
         double ldblTotalAdvPayment = ((amountAfterDiscounts/100) * Master().getDownPaymentRatesPercentage().doubleValue()) + lnAdvanceAmount ; //Added validation for total downpayment Arsiela 07-15-2026
+        ldblTotalAdvPayment = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(ldblTotalAdvPayment, true).replace(",", ""));  //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if(ldblTotalAdvPayment > amountAfterDiscounts){
             poJSON.put("result", "error");
             poJSON.put("message", "Invalid Downpayment Total.");
@@ -3514,6 +3534,7 @@ public class PurchaseOrder extends Transaction {
     public JSONObject netTotalChecker(int pnRow) {
         poJSON = new JSONObject();
         double NetTotl = Master().getNetTotal().doubleValue() + (Detail(pnRow).getQuantity().doubleValue() * Detail(pnRow).getUnitPrice().doubleValue());
+        NetTotl = Double.valueOf(CustomCommonUtil.setIntegerValueToDecimalFormat(NetTotl, true).replace(",", "")); //Added conversion to 4 decimal places to prevent infinitely recurring decimal digits. — Arsiela, 08-13-2026
         if (NetTotl >= 100000000.0000) {
             poJSON.put("result", "error");
             poJSON.put("message", "The net total exceeds the maximum allowed amount. Please reduce the value and try again.");
