@@ -2,7 +2,9 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +14,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -3512,6 +3518,90 @@ public class PurchaseOrderTest {
     }
 
     @Test
+    @Order(157)
+    public void testGetEntryByNoAuditRowReturnsSuccessWithBlankValues() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTENTRY-NO-AUDIT-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.noAuditRow("unused", "unused"));
+
+        JSONObject result = poController.getEntryBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertEquals("", String.valueOf(result.get("sCompnyNm")));
+        Assert.assertEquals("", String.valueOf(result.get("sEntryDte")));
+    }
+
+    @Test
+    @Order(158)
+    public void testGetEntryByShortModifiedUsesDirectUserLookup() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTENTRY-SHORT-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.withAuditRow("USR0001", java.time.LocalDateTime.of(2026, 8, 14, 10, 11, 12), "ignored", "Direct User Co"));
+
+        JSONObject result = poController.getEntryBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertEquals("Direct User Co", String.valueOf(result.get("sCompnyNm")));
+        Assert.assertEquals("08-14-2026 10:11:12", String.valueOf(result.get("sEntryDte")));
+    }
+
+    @Test
+    @Order(159)
+    public void testGetEntryByLongModifiedUsesDecryptPath() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTENTRY-DECRYPT-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.withAuditRow("ENCRYPTED_USER_001", java.time.LocalDateTime.of(2026, 8, 14, 10, 11, 13), "USRDEC01", "Decrypted User Co"));
+
+        JSONObject result = poController.getEntryBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertEquals("Decrypted User Co", String.valueOf(result.get("sCompnyNm")));
+        Assert.assertEquals("08-14-2026 10:11:13", String.valueOf(result.get("sEntryDte")));
+    }
+
+    @Test
+    @Order(160)
+    public void testGetEntryByBlankModifiedKeepsBlankEntryFields() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTENTRY-BLANK-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.withAuditRow("", java.time.LocalDateTime.of(2026, 8, 14, 10, 11, 14), "ignored", "Should Not Be Used"));
+
+        JSONObject result = poController.getEntryBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertEquals("", String.valueOf(result.get("sCompnyNm")));
+        Assert.assertEquals("", String.valueOf(result.get("sEntryDte")));
+    }
+
+    @Test
+    @Order(161)
+    public void testGetEntryByCatchReturnsErrorWhenResultSetThrows() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTENTRY-ERR-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.withFailingAuditResultSet("forced resultset error for getEntryBy"));
+
+        JSONObject result = poController.getEntryBy();
+        Assert.assertEquals("error", result.get("result"));
+        Assert.assertTrue(String.valueOf(result.get("message")).contains("forced resultset error for getEntryBy"));
+    }
+
+    @Test
     @Order(155)
     public void testGetConfirmedByReturnsSuccessWithSeededStatusHistory() throws Exception {
         resetController();
@@ -3532,14 +3622,82 @@ public class PurchaseOrderTest {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
-        loJSON = poController.OpenTransaction("GCO126000003");
-        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTCONF-ERR-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.withFailingAuditResultSet("forced resultset error for getConfirmedBy"));
 
         JSONObject result = poController.getConfirmedBy();
-        Assert.assertTrue("error".equals(result.get("result")) || "success".equals(result.get("result")));
-        if ("error".equals(result.get("result"))) {
-            Assert.assertTrue(String.valueOf(result.get("message")).length() > 0);
-        }
+        Assert.assertEquals("error", result.get("result"));
+        Assert.assertTrue(String.valueOf(result.get("message")).contains("forced resultset error for getConfirmedBy"));
+    }
+
+    @Test
+    @Order(162)
+    public void testGetConfirmedByNoStatusHistoryReturnsSuccessWithBlankValues() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTCONF-NO-ROW-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.noAuditRow("unused", "unused"));
+
+        JSONObject result = poController.getConfirmedBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertEquals("", String.valueOf(result.get("sConfirmed")));
+        Assert.assertEquals("", String.valueOf(result.get("sConfrmDte")));
+    }
+
+    @Test
+    @Order(163)
+    public void testGetConfirmedByShortModifiedUsesDirectUserLookup() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTCONF-SHORT-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.withAuditRow("USR0002", java.time.LocalDateTime.of(2026, 8, 14, 11, 12, 13), "ignored", "Confirm Direct User Co"));
+
+        JSONObject result = poController.getConfirmedBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertEquals("Confirm Direct User Co", String.valueOf(result.get("sConfirmed")));
+        Assert.assertEquals("08-14-2026 11:12:13", String.valueOf(result.get("sConfrmDte")));
+    }
+
+    @Test
+    @Order(164)
+    public void testGetConfirmedByLongModifiedUsesDecryptPath() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTCONF-DECRYPT-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.withAuditRow("ENCRYPTED_CONFIRM_001", java.time.LocalDateTime.of(2026, 8, 14, 11, 12, 14), "USRDEC02", "Confirm Decrypted User Co"));
+
+        JSONObject result = poController.getConfirmedBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertEquals("Confirm Decrypted User Co", String.valueOf(result.get("sConfirmed")));
+        Assert.assertEquals("08-14-2026 11:12:14", String.valueOf(result.get("sConfrmDte")));
+    }
+
+    @Test
+    @Order(165)
+    public void testGetConfirmedByBlankModifiedKeepsBlankFields() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        poController.Master().setTransactionNo("UTCONF-BLANK-" + System.nanoTime());
+
+        setPrivateFieldInHierarchy(poController, "poGRider",
+                EntryByTestGRider.withAuditRow("", java.time.LocalDateTime.of(2026, 8, 14, 11, 12, 15), "ignored", "Should Not Be Used"));
+
+        JSONObject result = poController.getConfirmedBy();
+        Assert.assertEquals("success", result.get("result"));
+        Assert.assertEquals("", String.valueOf(result.get("sConfirmed")));
+        Assert.assertEquals("", String.valueOf(result.get("sConfrmDte")));
     }
 
     @Test
@@ -3958,6 +4116,177 @@ public class PurchaseOrderTest {
         @Override
         public Timestamp getServerDate() throws SQLException {
             throw new SQLException("forced sql exception inside saveOthers catch");
+        }
+    }
+
+    private static final class EntryByTestGRider extends GRiderCAS {
+        private final List<Map<String, Object>> auditRows;
+        private final boolean failOnAuditDateRead;
+        private final String failMessage;
+        private final String decryptedValue;
+        private final String companyName;
+
+        private EntryByTestGRider(List<Map<String, Object>> auditRows, boolean failOnAuditDateRead,
+                                  String failMessage, String decryptedValue, String companyName) {
+            this.auditRows = auditRows;
+            this.failOnAuditDateRead = failOnAuditDateRead;
+            this.failMessage = failMessage;
+            this.decryptedValue = decryptedValue;
+            this.companyName = companyName;
+        }
+
+        static EntryByTestGRider noAuditRow(String decryptedValue, String companyName) {
+            return new EntryByTestGRider(new ArrayList<Map<String, Object>>(), false, "", decryptedValue, companyName);
+        }
+
+        static EntryByTestGRider withAuditRow(String modified, java.time.LocalDateTime modifiedDate,
+                                              String decryptedValue, String companyName) {
+            List<Map<String, Object>> rows = new ArrayList<>();
+            Map<String, Object> row = new HashMap<>();
+            row.put("sModified", modified);
+            row.put("dModified", Timestamp.valueOf(modifiedDate));
+            rows.add(row);
+            return new EntryByTestGRider(rows, false, "", decryptedValue, companyName);
+        }
+
+        static EntryByTestGRider withFailingAuditResultSet(String message) {
+            List<Map<String, Object>> rows = new ArrayList<>();
+            Map<String, Object> row = new HashMap<>();
+            row.put("sModified", "USR001");
+            row.put("dModified", Timestamp.valueOf(java.time.LocalDateTime.of(2026, 8, 14, 10, 11, 15)));
+            rows.add(row);
+            return new EntryByTestGRider(rows, true, message, "USR001", "Any Co");
+        }
+
+        @Override
+        public ResultSet executeQuery(String sql) {
+            if (sql != null && sql.contains("FROM PO_Master a")) {
+                return proxyResultSet(auditRows, failOnAuditDateRead, failMessage);
+            }
+
+            if (sql != null && sql.contains("from xxxSysUser a")) {
+                List<Map<String, Object>> rows = new ArrayList<>();
+                if (companyName != null) {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("sCompnyNm", companyName);
+                    rows.add(row);
+                }
+                return proxyResultSet(rows, false, "");
+            }
+
+            return proxyResultSet(new ArrayList<Map<String, Object>>(), false, "");
+        }
+
+        @Override
+        public String Decrypt(String value) {
+            return decryptedValue;
+        }
+
+        private static ResultSet proxyResultSet(List<Map<String, Object>> rows, boolean failOnDateRead, String failMessage) {
+            InvocationHandler handler = new InvocationHandler() {
+                private int cursor = -1;
+                private boolean closed = false;
+
+                @Override
+                public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                    String name = method.getName();
+                    if ("close".equals(name)) {
+                        closed = true;
+                        return null;
+                    }
+                    if ("isClosed".equals(name)) {
+                        return closed;
+                    }
+                    if ("beforeFirst".equals(name)) {
+                        cursor = -1;
+                        return null;
+                    }
+                    if ("isBeforeFirst".equals(name)) {
+                        return !rows.isEmpty() && cursor < 0;
+                    }
+                    if ("last".equals(name)) {
+                        if (rows.isEmpty()) {
+                            cursor = -1;
+                            return false;
+                        }
+                        cursor = rows.size() - 1;
+                        return true;
+                    }
+                    if ("first".equals(name)) {
+                        if (rows.isEmpty()) {
+                            cursor = -1;
+                            return false;
+                        }
+                        cursor = 0;
+                        return true;
+                    }
+                    if ("absolute".equals(name) && args != null && args.length == 1) {
+                        int rowIndex = ((Number) args[0]).intValue();
+                        if (rowIndex <= 0 || rowIndex > rows.size()) {
+                            cursor = rows.size();
+                            return false;
+                        }
+                        cursor = rowIndex - 1;
+                        return true;
+                    }
+                    if ("getRow".equals(name)) {
+                        return (cursor >= 0 && cursor < rows.size()) ? cursor + 1 : 0;
+                    }
+                    if ("next".equals(name)) {
+                        if (cursor + 1 < rows.size()) {
+                            cursor++;
+                            return true;
+                        }
+                        cursor = rows.size();
+                        return false;
+                    }
+                    if ("getString".equals(name) && args != null && args.length == 1) {
+                        Object value = currentRowValue(rows, cursor, String.valueOf(args[0]));
+                        return value == null ? null : String.valueOf(value);
+                    }
+                    if ("getObject".equals(name) && args != null && args.length == 2 && args[1] instanceof Class) {
+                        if (failOnDateRead && "dModified".equals(String.valueOf(args[0]))) {
+                            throw new SQLException(failMessage);
+                        }
+                        Object value = currentRowValue(rows, cursor, String.valueOf(args[0]));
+                        Class<?> targetClass = (Class<?>) args[1];
+                        if (value == null) {
+                            return null;
+                        }
+                        if (targetClass == java.time.LocalDateTime.class && value instanceof Timestamp) {
+                            return ((Timestamp) value).toLocalDateTime();
+                        }
+                        return value;
+                    }
+
+                    Class<?> returnType = method.getReturnType();
+                    if (returnType == boolean.class) {
+                        return false;
+                    }
+                    if (returnType == int.class) {
+                        return 0;
+                    }
+                    if (returnType == long.class) {
+                        return 0L;
+                    }
+                    if (returnType == float.class) {
+                        return 0f;
+                    }
+                    if (returnType == double.class) {
+                        return 0d;
+                    }
+                    return null;
+                }
+            };
+
+            return (ResultSet) Proxy.newProxyInstance(ResultSet.class.getClassLoader(), new Class[]{ResultSet.class}, handler);
+        }
+
+        private static Object currentRowValue(List<Map<String, Object>> rows, int cursor, String columnName) {
+            if (cursor < 0 || cursor >= rows.size()) {
+                return null;
+            }
+            return rows.get(cursor).get(columnName);
         }
     }
 
