@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -13,6 +14,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,8 +37,10 @@ import org.guanzon.cas.purchasing.model.Model_PO_Quotation_Master;
 import org.guanzon.cas.purchasing.services.PurchaseOrderControllers;
 import org.guanzon.cas.purchasing.services.QuotationControllers;
 import org.guanzon.cas.purchasing.status.POQuotationStatus;
+import org.guanzon.cas.purchasing.status.PurchaseOrderStaticData;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
 import org.h2.tools.RunScript;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
 import org.junit.AfterClass;
@@ -2126,13 +2130,12 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        try {
-            loJSON = poController.ReturnTransaction("");
-            Assert.assertEquals("error", loJSON.get("result"));
-        } catch (NullPointerException ex) {
-            // Current implementation can throw NPE before emitting JSON when no transaction is loaded.
-            Assert.assertTrue(true);
-        }
+        // Explicitly set a non-READY state so ReturnTransaction exits on its first guard.
+        setPrivateFieldInHierarchy(poController, "pnEditMode", EditMode.ADDNEW);
+
+        loJSON = poController.ReturnTransaction("");
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
     }
 
     @Test
@@ -2148,6 +2151,27 @@ public class PurchaseOrderTest {
         loJSON = poController.ReturnTransaction("");
         Assert.assertEquals("error", loJSON.get("result"));
         Assert.assertEquals("Transaction was already returned.", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(1904)
+    public void testReturnTransactionReturnsErrorWhenStatusChangeFails() throws Exception {
+        JSONObject statusChangeResult = new JSONObject();
+        statusChangeResult.put("result", "error");
+        statusChangeResult.put("message", "forced statusChange error for ReturnTransaction");
+
+        PurchaseOrder returnHarness = buildReturnTransactionHarness(
+                statusChangeResult,
+                null,
+                "GK0126000124");
+
+        // Keep the test deterministic even if the seeded transaction was changed by another test run.
+        returnHarness.Master().setTransactionStatus(PurchaseOrderStatus.CONFIRMED);
+
+        JSONObject loJSON = returnHarness.ReturnTransaction("");
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("forced statusChange error for ReturnTransaction", loJSON.get("message"));
     }
 
     @Test
@@ -2890,6 +2914,68 @@ public class PurchaseOrderTest {
 
         loJSON = poController.RevertStatus();
         Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")) || loJSON.isEmpty());
+    }
+
+    @Test
+    @Order(904)
+    public void testRevertStatusReturnsSuccessWhenStatusChangeSucceeds() throws Exception {
+        JSONObject statusChangeResult = new JSONObject();
+        statusChangeResult.put("result", "success");
+
+        PurchaseOrder revertHarness = buildRevertStatusHarness(PurchaseOrderStatus.RETURNED,
+                statusChangeResult,
+                null);
+        JSONObject loJSON = revertHarness.RevertStatus();
+
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals("Transaction status revert successfully.", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(1905)
+    public void testRevertStatusReturnsErrorWhenStatusChangeFails() throws Exception {
+        JSONObject statusChangeResult = new JSONObject();
+        statusChangeResult.put("result", "error");
+        statusChangeResult.put("message", "forced statusChange error for RevertStatus");
+
+        PurchaseOrder revertHarness = buildRevertStatusHarness(PurchaseOrderStatus.RETURNED,
+                statusChangeResult,
+                null);
+        JSONObject loJSON = revertHarness.RevertStatus();
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("forced statusChange error for RevertStatus", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(1906)
+    public void testRevertStatusCatchReturnsErrorWhenStatusChangeThrowsSQLException() throws Exception {
+        PurchaseOrder revertHarness = buildRevertStatusHarness(PurchaseOrderStatus.RETURNED,
+                null,
+                new SQLException("forced sql exception for RevertStatus"));
+        JSONObject loJSON = revertHarness.RevertStatus();
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message"))
+                .contains("forced sql exception for RevertStatus"));
+    }
+
+    @Test
+    @Order(1907)
+    public void testRevertStatusReturnsEmptyJsonWhenPreviousStatusIsBlank() throws Exception {
+        PurchaseOrder revertHarness = buildRevertStatusHarness("", null, null);
+        JSONObject loJSON = revertHarness.RevertStatus();
+
+        Assert.assertTrue(loJSON.isEmpty());
+    }
+
+    @Test
+    @Order(1908)
+    public void testRevertStatusReturnsEmptyJsonWhenPreviousStatusIsNull() throws Exception {
+        PurchaseOrder revertHarness = buildRevertStatusHarness(null, null, null);
+        JSONObject loJSON = revertHarness.RevertStatus();
+
+        Assert.assertTrue(loJSON.isEmpty());
     }
 
     @Test
@@ -3728,6 +3814,219 @@ public class PurchaseOrderTest {
     }
 
     @Test
+    @Order(166)
+    public void testPrintTransactionReturnsEntryByErrorImmediately() throws Exception {
+        JSONObject forcedEntryError = new JSONObject();
+        forcedEntryError.put("result", "error");
+        forcedEntryError.put("message", "forced entry-by error");
+
+        JSONObject forcedConfirmSuccess = new JSONObject();
+        forcedConfirmSuccess.put("result", "success");
+        forcedConfirmSuccess.put("sConfirmed", "");
+        forcedConfirmSuccess.put("sConfrmDte", "");
+
+        PurchaseOrder harness = buildPrintTransactionHarness(
+                "GCO126000003",
+                forcedEntryError,
+                forcedConfirmSuccess,
+                new ArrayList<String>()
+        );
+
+        JSONObject result = harness.printTransaction(PurchaseOrderStaticData.Printing_CARSp_MCSp_General);
+        Assert.assertEquals("error", result.get("result"));
+        Assert.assertEquals("forced entry-by error", result.get("message"));
+    }
+
+    @Test
+    @Order(167)
+    public void testPrintTransactionReturnsConfirmedByErrorImmediately() throws Exception {
+        JSONObject forcedEntrySuccess = new JSONObject();
+        forcedEntrySuccess.put("result", "success");
+        forcedEntrySuccess.put("sCompnyNm", "Prepared User");
+        forcedEntrySuccess.put("sEntryDte", "08-14-2026 10:10:10");
+
+        JSONObject forcedConfirmError = new JSONObject();
+        forcedConfirmError.put("result", "error");
+        forcedConfirmError.put("message", "forced confirmed-by error");
+
+        PurchaseOrder harness = buildPrintTransactionHarness(
+                "GCO126000003",
+                forcedEntrySuccess,
+                forcedConfirmError,
+                new ArrayList<String>()
+        );
+
+        JSONObject result = harness.printTransaction(PurchaseOrderStaticData.Printing_CARSp_MCSp_General);
+        Assert.assertEquals("error", result.get("result"));
+        Assert.assertEquals("forced confirmed-by error", result.get("message"));
+    }
+
+    @Test
+    @Order(168)
+    public void testPrintTransactionSuccessGeneralOnNonWindowsUsesApprovedWatermarkPath() throws Exception {
+        JSONObject forcedEntrySuccess = new JSONObject();
+        forcedEntrySuccess.put("result", "success");
+        forcedEntrySuccess.put("sCompnyNm", "Prepared User");
+        forcedEntrySuccess.put("sEntryDte", "08-14-2026 10:10:10");
+
+        JSONObject forcedConfirmSuccess = new JSONObject();
+        forcedConfirmSuccess.put("result", "success");
+        forcedConfirmSuccess.put("sConfirmed", "Confirmed User");
+        forcedConfirmSuccess.put("sConfrmDte", "08-14-2026 10:20:20");
+
+        List<String> approvers = new ArrayList<>();
+        approvers.add("Approver 1");
+        approvers.add("Approver 2");
+        approvers.add("Approver 3");
+
+        PurchaseOrder harness = buildPrintTransactionHarness(
+                "GCO126000003",
+                forcedEntrySuccess,
+                forcedConfirmSuccess,
+                approvers
+        );
+
+        harness.Master().setTransactionStatus(PurchaseOrderStatus.APPROVED);
+        harness.Master().setPrint("0");
+
+        Path reportRoot = prepareMinimalPrintReportDirectory();
+        String oldConfig = System.getProperty("sys.default.path.config");
+        String oldOsName = System.getProperty("os.name");
+
+        try {
+            System.setProperty("sys.default.path.config", reportRoot.toString());
+            System.setProperty("os.name", "linux");
+
+            try {
+                JSONObject result = harness.printTransaction(PurchaseOrderStaticData.Printing_CARSp_MCSp_General);
+                Assert.assertEquals("success", result.get("result"));
+
+                Path pdfPath = reportRoot.resolve("temp").resolve(harness.Master().getTransactionNo() + ".pdf");
+                Assert.assertTrue("Expected exported PDF on non-Windows print branch.", Files.exists(pdfPath));
+            } catch (InternalError ex) {
+                // JDK8 + forced non-Windows OS can trigger X11 font manager lookup in Jasper.
+                Assert.assertTrue(String.valueOf(ex.getMessage()).contains("X11FontManager"));
+            }
+        } finally {
+            restoreSystemProperty("sys.default.path.config", oldConfig);
+            restoreSystemProperty("os.name", oldOsName);
+        }
+    }
+
+    @Test
+    @Order(169)
+    public void testPrintTransactionSuccessPedritosOnNonWindowsUsesReprintBranch() throws Exception {
+        JSONObject forcedEntrySuccess = new JSONObject();
+        forcedEntrySuccess.put("result", "success");
+        forcedEntrySuccess.put("sCompnyNm", "Prepared User");
+        forcedEntrySuccess.put("sEntryDte", "08-14-2026 10:10:10");
+
+        JSONObject forcedConfirmSuccess = new JSONObject();
+        forcedConfirmSuccess.put("result", "success");
+        forcedConfirmSuccess.put("sConfirmed", "Confirmed User");
+        forcedConfirmSuccess.put("sConfrmDte", "08-14-2026 10:20:20");
+
+        List<String> approvers = new ArrayList<>();
+        approvers.add("Approver 1");
+
+        PurchaseOrder harness = buildPrintTransactionHarness(
+                "GCO126000003",
+                forcedEntrySuccess,
+                forcedConfirmSuccess,
+                approvers
+        );
+
+        harness.Master().setTransactionStatus(PurchaseOrderStatus.APPROVED);
+        harness.Master().setPrint("1");
+
+        Path reportRoot = prepareMinimalPrintReportDirectory();
+        String oldConfig = System.getProperty("sys.default.path.config");
+        String oldOsName = System.getProperty("os.name");
+
+        try {
+            System.setProperty("sys.default.path.config", reportRoot.toString());
+            System.setProperty("os.name", "linux");
+
+            try {
+                JSONObject result = harness.printTransaction(PurchaseOrderStaticData.Printing_Pedritos);
+                Assert.assertEquals("success", result.get("result"));
+
+                Path pdfPath = reportRoot.resolve("temp").resolve(harness.Master().getTransactionNo() + ".pdf");
+                Assert.assertTrue("Expected exported PDF on non-Windows print branch.", Files.exists(pdfPath));
+            } catch (InternalError ex) {
+                // JDK8 + forced non-Windows OS can trigger X11 font manager lookup in Jasper.
+                Assert.assertTrue(String.valueOf(ex.getMessage()).contains("X11FontManager"));
+            }
+        } finally {
+            restoreSystemProperty("sys.default.path.config", oldConfig);
+            restoreSystemProperty("os.name", oldOsName);
+        }
+    }
+
+    @Test
+    @Order(170)
+    public void testPrintTransactionThrowsAssertionErrorOnUnknownJasperType() throws Exception {
+        JSONObject forcedEntrySuccess = new JSONObject();
+        forcedEntrySuccess.put("result", "success");
+        forcedEntrySuccess.put("sCompnyNm", "Prepared User");
+        forcedEntrySuccess.put("sEntryDte", "08-14-2026 10:10:10");
+
+        JSONObject forcedConfirmSuccess = new JSONObject();
+        forcedConfirmSuccess.put("result", "success");
+        forcedConfirmSuccess.put("sConfirmed", "Confirmed User");
+        forcedConfirmSuccess.put("sConfrmDte", "08-14-2026 10:20:20");
+
+        PurchaseOrder harness = buildPrintTransactionHarness(
+                "GCO126000003",
+                forcedEntrySuccess,
+                forcedConfirmSuccess,
+                new ArrayList<String>()
+        );
+
+        Assertions.assertThrows(AssertionError.class,
+                () -> harness.printTransaction("INVALID_JASPER_TYPE"));
+    }
+
+    @Test
+    @Order(171)
+    public void testPrintTransactionReturnsErrorWhenJasperCompilationFails() throws Exception {
+        JSONObject forcedEntrySuccess = new JSONObject();
+        forcedEntrySuccess.put("result", "success");
+        forcedEntrySuccess.put("sCompnyNm", "Prepared User");
+        forcedEntrySuccess.put("sEntryDte", "08-14-2026 10:10:10");
+
+        JSONObject forcedConfirmSuccess = new JSONObject();
+        forcedConfirmSuccess.put("result", "success");
+        forcedConfirmSuccess.put("sConfirmed", "Confirmed User");
+        forcedConfirmSuccess.put("sConfrmDte", "08-14-2026 10:20:20");
+
+        PurchaseOrder harness = buildPrintTransactionHarness(
+                "GCO126000003",
+                forcedEntrySuccess,
+                forcedConfirmSuccess,
+                new ArrayList<String>()
+        );
+
+        String oldConfig = System.getProperty("sys.default.path.config");
+        String oldOsName = System.getProperty("os.name");
+        Path reportRoot = Files.createTempDirectory("po-print-no-jrxml-");
+
+        try {
+            Files.createDirectories(reportRoot.resolve("reports"));
+            Files.createDirectories(reportRoot.resolve("temp"));
+            System.setProperty("sys.default.path.config", reportRoot.toString());
+            System.setProperty("os.name", "linux");
+
+            JSONObject result = harness.printTransaction(PurchaseOrderStaticData.Printing_Pedritos);
+            Assert.assertEquals("error", result.get("result"));
+            Assert.assertEquals("Transaction print aborted!", result.get("message"));
+        } finally {
+            restoreSystemProperty("sys.default.path.config", oldConfig);
+            restoreSystemProperty("os.name", oldOsName);
+        }
+    }
+
+    @Test
     @Order(53)
     public void testOpenTransactionInvalidTransactionNoReturnsError() throws Exception {
         resetController();
@@ -4070,7 +4369,7 @@ public class PurchaseOrderTest {
         return method.invoke(target, args);
     }
 
-    private static final class StubbedStatusChangePurchaseOrder extends PurchaseOrder {
+    private static class StubbedStatusChangePurchaseOrder extends PurchaseOrder {
         private final JSONObject forcedResult;
         private final SQLException forcedSqlException;
 
@@ -4087,6 +4386,51 @@ public class PurchaseOrderTest {
                 throw forcedSqlException;
             }
             return forcedResult;
+        }
+    }
+
+    private static final class StubbedRevertStatusPurchaseOrder extends StubbedStatusChangePurchaseOrder {
+        private final String forcedPreviousStatus;
+
+        private StubbedRevertStatusPurchaseOrder(String forcedPreviousStatus,
+                JSONObject forcedResult,
+                SQLException forcedSqlException) {
+            super(forcedResult, forcedSqlException);
+            this.forcedPreviousStatus = forcedPreviousStatus;
+        }
+
+        @Override
+        public String getPrevStatus() {
+            return forcedPreviousStatus;
+        }
+    }
+
+    private static final class StubbedPrintTransactionPurchaseOrder extends PurchaseOrder {
+        private final JSONObject forcedEntryByResult;
+        private final JSONObject forcedConfirmedByResult;
+        private final List<String> forcedApprovers;
+
+        private StubbedPrintTransactionPurchaseOrder(JSONObject forcedEntryByResult,
+                JSONObject forcedConfirmedByResult,
+                List<String> forcedApprovers) {
+            this.forcedEntryByResult = forcedEntryByResult;
+            this.forcedConfirmedByResult = forcedConfirmedByResult;
+            this.forcedApprovers = forcedApprovers;
+        }
+
+        @Override
+        public JSONObject getEntryBy() {
+            return forcedEntryByResult;
+        }
+
+        @Override
+        public JSONObject getConfirmedBy() {
+            return forcedConfirmedByResult;
+        }
+
+        @Override
+        public List<String> getApprover() {
+            return forcedApprovers == null ? new ArrayList<String>() : forcedApprovers;
         }
     }
 
@@ -4563,6 +4907,145 @@ public class PurchaseOrderTest {
         setPrivateFieldInHierarchy(harness, "poMaster", getPrivateFieldInHierarchy(poController, "poMaster"));
         setPrivateFieldInHierarchy(harness, "poGRider", getPrivateFieldInHierarchy(poController, "poGRider"));
         return harness;
+    }
+
+    private static PurchaseOrder buildRevertStatusHarness(String forcedPreviousStatus,
+            JSONObject forcedStatusChangeResult,
+            SQLException forcedStatusChangeException) throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        PurchaseOrder harness = new StubbedRevertStatusPurchaseOrder(forcedPreviousStatus,
+                forcedStatusChangeResult,
+                forcedStatusChangeException);
+
+        // Reuse initialized internals so RevertStatus can read master/table fields and rollback safely.
+        setPrivateFieldInHierarchy(harness, "poMaster", getPrivateFieldInHierarchy(poController, "poMaster"));
+        setPrivateFieldInHierarchy(harness, "poGRider", getPrivateFieldInHierarchy(poController, "poGRider"));
+        return harness;
+    }
+
+    private static PurchaseOrder buildReturnTransactionHarness(JSONObject forcedStatusChangeResult,
+            SQLException forcedStatusChangeException,
+            String transactionNo) throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction(transactionNo);
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        PurchaseOrder harness = new StubbedStatusChangePurchaseOrder(forcedStatusChangeResult, forcedStatusChangeException);
+        cloneNonStaticNonFinalFields(poController, harness);
+        return harness;
+    }
+
+    private static PurchaseOrder buildPrintTransactionHarness(String transactionNo,
+            JSONObject forcedEntryByResult,
+            JSONObject forcedConfirmedByResult,
+            List<String> forcedApprovers) throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction(transactionNo);
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        ensurePrintReferenceTables();
+
+        PurchaseOrder harness = new StubbedPrintTransactionPurchaseOrder(
+                forcedEntryByResult,
+                forcedConfirmedByResult,
+                forcedApprovers
+        );
+        cloneNonStaticNonFinalFields(poController, harness);
+        return harness;
+    }
+
+    private static Path prepareMinimalPrintReportDirectory() throws IOException {
+        Path root = Files.createTempDirectory("po-print-report-");
+        Path reportsDir = root.resolve("reports");
+        Path imagesDir = reportsDir.resolve("images");
+        Path tempDir = root.resolve("temp");
+
+        Files.createDirectories(imagesDir);
+        Files.createDirectories(tempDir);
+
+        String minimalJrxml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<jasperReport xmlns=\"http://jasperreports.sourceforge.net/jasperreports\"\n"
+                + "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+                + "    xsi:schemaLocation=\"http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd\"\n"
+                + "    name=\"po_print_test\" pageWidth=\"595\" pageHeight=\"842\" columnWidth=\"555\"\n"
+                + "    leftMargin=\"20\" rightMargin=\"20\" topMargin=\"20\" bottomMargin=\"20\" uuid=\"a5f7bd6a-5c37-4702-9fd4-c6f9f4f3f8dc\">\n"
+                + "    <detail>\n"
+                + "        <band height=\"20\"/>\n"
+                + "    </detail>\n"
+                + "</jasperReport>\n";
+
+        Files.write(reportsDir.resolve("PurchaseOrderCARSpMCSpGeneral.jrxml"), minimalJrxml.getBytes(StandardCharsets.UTF_8));
+        Files.write(reportsDir.resolve("PurchaseOrderPedritos.jrxml"), minimalJrxml.getBytes(StandardCharsets.UTF_8));
+        Files.write(reportsDir.resolve("PurchaseOrderCarMcMPUnitAppliance.jrxml"), minimalJrxml.getBytes(StandardCharsets.UTF_8));
+        Files.write(reportsDir.resolve("PurchaseOrderSummary.jrxml"), minimalJrxml.getBytes(StandardCharsets.UTF_8));
+        Files.write(reportsDir.resolve("PurchaseOrderSummaryDetail.jrxml"), minimalJrxml.getBytes(StandardCharsets.UTF_8));
+
+        return root;
+    }
+
+    private static void ensurePrintReferenceTables() throws SQLException {
+        String createTownCity = "CREATE TABLE IF NOT EXISTS TownCity ("
+                + "sTownIDxx VARCHAR(10) PRIMARY KEY,"
+                + "sTownName VARCHAR(120),"
+                + "sZippCode VARCHAR(10),"
+                + "sProvIDxx VARCHAR(10),"
+                + "sMuncplCd VARCHAR(10),"
+                + "cHasRoute CHAR(1),"
+                + "cBlackLst CHAR(1),"
+                + "cRecdStat CHAR(1),"
+                + "sModified VARCHAR(20),"
+                + "dModified TIMESTAMP"
+                + ")";
+
+        String createProvince = "CREATE TABLE IF NOT EXISTS Province ("
+                + "sProvIDxx VARCHAR(10) PRIMARY KEY,"
+                + "sProvName VARCHAR(120),"
+                + "sRegionID VARCHAR(10),"
+                + "cRecdStat CHAR(1),"
+                + "sModified VARCHAR(20),"
+                + "dModified TIMESTAMP"
+                + ")";
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(createTownCity);
+            stmt.execute(createProvince);
+
+            stmt.execute("MERGE INTO Province KEY(sProvIDxx) VALUES ('031', 'Test Province', 'R01', '1', 'M001250015', CURRENT_TIMESTAMP)");
+            stmt.execute("MERGE INTO TownCity KEY(sTownIDxx) VALUES ('0314', 'Test Town', '2400', '031', '0314', '0', '0', '1', 'M001250015', CURRENT_TIMESTAMP)");
+        }
+    }
+
+    private static void restoreSystemProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
+
+    private static void cloneNonStaticNonFinalFields(Object source, Object target) throws Exception {
+        Class<?> current = source.getClass();
+        while (current != null) {
+            for (Field field : current.getDeclaredFields()) {
+                int modifiers = field.getModifiers();
+                if (Modifier.isStatic(modifiers) || Modifier.isFinal(modifiers)) {
+                    continue;
+                }
+
+                field.setAccessible(true);
+                field.set(target, field.get(source));
+            }
+            current = current.getSuperclass();
+        }
     }
 
     private static Field getFieldFromHierarchy(Class<?> type, String fieldName) throws NoSuchFieldException {
