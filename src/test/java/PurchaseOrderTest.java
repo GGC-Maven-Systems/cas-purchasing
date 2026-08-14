@@ -1235,6 +1235,74 @@ public class PurchaseOrderTest {
     }
 
     @Test
+    @Order(1909)
+    public void testGetAccessTokenReturnsAccessKeyForValidUnexpiredToken() throws Exception {
+        resetAccessTokenCache();
+        Path tokenFile = Files.createTempFile("po-access-token-valid-", ".json");
+        String expectedAccessKey = "ACCESS-" + System.nanoTime();
+        String tokenJson = "{\"created\":\"2999-12-31 23:59:59\",\"access_key\":\"" + expectedAccessKey
+                + "\",\"parent\":\"TEST_PARENT\"}";
+        Files.write(tokenFile, tokenJson.getBytes(StandardCharsets.UTF_8));
+
+        try {
+            String accessKey = invokeGetAccessToken(tokenFile.toString());
+            Assert.assertEquals(expectedAccessKey, accessKey);
+        } finally {
+            resetAccessTokenCache();
+        }
+    }
+
+    @Test
+    @Order(1910)
+    public void testGetAccessTokenUsesCachedTokenWhenCacheAlreadyLoaded() throws Exception {
+        resetAccessTokenCache();
+        Path tokenFile = Files.createTempFile("po-access-token-cache-", ".json");
+        String expectedAccessKey = "CACHE-" + System.nanoTime();
+        String tokenJson = "{\"created\":\"2999-12-31 23:59:59\",\"access_key\":\"" + expectedAccessKey
+                + "\",\"parent\":\"TEST_PARENT\"}";
+        Files.write(tokenFile, tokenJson.getBytes(StandardCharsets.UTF_8));
+
+        try {
+            String firstCall = invokeGetAccessToken(tokenFile.toString());
+            String secondCall = invokeGetAccessToken(tokenFile.toString() + ".missing");
+
+            Assert.assertEquals(expectedAccessKey, firstCall);
+            Assert.assertEquals(expectedAccessKey, secondCall);
+        } finally {
+            resetAccessTokenCache();
+        }
+    }
+
+    @Test
+    @Order(1911)
+    public void testGetAccessTokenReturnsNullWhenTokenFileDoesNotExist() throws Exception {
+        resetAccessTokenCache();
+        String missingPath = Paths.get(System.getProperty("java.io.tmpdir"),
+                "missing-access-token-" + System.nanoTime() + ".json").toString();
+        try {
+            String accessKey = invokeGetAccessToken(missingPath);
+            Assert.assertNull(accessKey);
+        } finally {
+            resetAccessTokenCache();
+        }
+    }
+
+    @Test
+    @Order(1912)
+    public void testGetAccessTokenReturnsNullWhenTokenFileIsMalformed() throws Exception {
+        resetAccessTokenCache();
+        Path tokenFile = Files.createTempFile("po-access-token-malformed-", ".json");
+        Files.write(tokenFile, "not-a-valid-json-token".getBytes(StandardCharsets.UTF_8));
+
+        try {
+            String accessKey = invokeGetAccessToken(tokenFile.toString());
+            Assert.assertNull(accessKey);
+        } finally {
+            resetAccessTokenCache();
+        }
+    }
+
+    @Test
     @Order(77)
     public void testSetDiscountRateNegativeValueReturnsError() throws Exception {
         resetController();
@@ -5064,6 +5132,18 @@ public class PurchaseOrderTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         return field.getBoolean(target);
+    }
+
+    private static String invokeGetAccessToken(String accessPath) throws Exception {
+        Method method = PurchaseOrder.class.getDeclaredMethod("getAccessToken", String.class);
+        method.setAccessible(true);
+        return (String) method.invoke(null, accessPath);
+    }
+
+    private static void resetAccessTokenCache() throws Exception {
+        Field tokenField = PurchaseOrder.class.getDeclaredField("token");
+        tokenField.setAccessible(true);
+        tokenField.set(null, null);
     }
 
     private static String seedStockRequestForSetValueOthers(double approvedQty, double requestQty) throws SQLException {
