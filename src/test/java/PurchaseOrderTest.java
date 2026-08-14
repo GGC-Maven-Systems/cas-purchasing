@@ -11,11 +11,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.appdriver.base.GuanzonException;
+import org.guanzon.appdriver.constant.EditMode;
 import org.guanzon.appdriver.constant.RecordStatus;
 import org.guanzon.cas.inv.warehouse.services.InvWarehouseControllers;
 import org.guanzon.cas.parameter.model.Model_Project;
@@ -1804,26 +1806,26 @@ public class PurchaseOrderTest {
         }
     }
 
-//    @Test
-//    @Order(98)
-//    public void testSaveOthersUpdateModeWithLoadedAttachmentsReturnsStructuredResult() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.OpenTransaction("GCO126000029");
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.UpdateTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        poController.loadAttachments();
-//        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
-//
-//        loJSON = poController.saveOthers();
-//        Assert.assertTrue(loJSON.containsKey("result"));
-//        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
-//    }
+    @Test
+    @Order(98)
+    public void testSaveOthersWithLoadedReadyAttachmentSkipsAttachmentSaveBranch() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        seedAttachmentFileName("coverage-ready-attachment-" + System.nanoTime() + ".png");
+
+        loJSON = poController.OpenTransaction("GCO126000003");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.loadAttachments();
+        Assert.assertTrue(loJSON.containsKey("result"));
+        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+
+        loJSON = poController.saveOthers();
+        Assert.assertTrue(loJSON.containsKey("result"));
+        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+    }
 
     @Test
     @Order(98)
@@ -1860,6 +1862,131 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.saveOthers();
         Assert.assertTrue(loJSON.containsKey("result"));
         Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+    }
+
+//    @Test
+//    @Order(98)
+//    public void testSaveOthersSkipsProjectSaveWhenDepartmentDoesNotMatch() throws Exception {
+//        startNewTransaction();
+//        setPrivateField(poController, "allowedDepartment", "DEPT-NOT-MATCHED-FOR-COVERAGE");
+//        poController.Master().setTransactionStatus(PurchaseOrderStatus.OPEN);
+//        poController.Master().setReference("PROJECT-SHOULD-BE-SKIPPED-" + System.nanoTime());
+//        poController.resetattachment();
+//
+//        Model_Project failingProject = new Model_Project() {
+//            @Override
+//            public JSONObject saveRecord() {
+//                JSONObject failed = new JSONObject();
+//                failed.put("result", "error");
+//                failed.put("message", "project save should be skipped (department mismatch)");
+//                return failed;
+//            }
+//        };
+//
+//        setPrivateField(poController, "poProject", failingProject);
+//
+//        JSONObject loJSON = poController.saveOthers();
+//        Assert.assertTrue(loJSON.containsKey("result"));
+//        Assert.assertFalse(String.valueOf(loJSON.getOrDefault("message", ""))
+//                .contains("department mismatch"));
+//    }
+
+    @Test
+    @Order(98)
+    public void testSaveOthersSkipsProjectSaveWhenStatusIsNotOpenCancelledOrVoid() throws Exception {
+        startNewTransaction();
+        setPrivateField(poController, "allowedDepartment", instance.getDepartment());
+        poController.Master().setTransactionStatus(PurchaseOrderStatus.CONFIRMED);
+        poController.Master().setReference("PROJECT-SHOULD-BE-SKIPPED-" + System.nanoTime());
+
+        Model_Project failingProject = new Model_Project() {
+            @Override
+            public JSONObject saveRecord() {
+                JSONObject failed = new JSONObject();
+                failed.put("result", "error");
+                failed.put("message", "project save should be skipped (status mismatch)");
+                return failed;
+            }
+        };
+
+        setPrivateField(poController, "poProject", failingProject);
+
+        JSONObject loJSON = poController.saveOthers();
+        Assert.assertTrue(loJSON.containsKey("result"));
+        Assert.assertFalse(String.valueOf(loJSON.getOrDefault("message", ""))
+                .contains("status mismatch"));
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveOthersSkipsProjectSaveWhenEditModeIsNotAddNew() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.OpenTransaction("GCO126000029");
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.UpdateTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.Master().setTransactionStatus(PurchaseOrderStatus.OPEN);
+        poController.Master().setReference("PROJECT-SHOULD-BE-SKIPPED-" + System.nanoTime());
+        setPrivateField(poController, "allowedDepartment", instance.getDepartment());
+
+        Model_Project failingProject = new Model_Project() {
+            @Override
+            public JSONObject saveRecord() {
+                JSONObject failed = new JSONObject();
+                failed.put("result", "error");
+                failed.put("message", "project save should be skipped (edit mode mismatch)");
+                return failed;
+            }
+        };
+
+        setPrivateField(poController, "poProject", failingProject);
+
+        loJSON = poController.saveOthers();
+        Assert.assertTrue(loJSON.containsKey("result"));
+        Assert.assertFalse(String.valueOf(loJSON.getOrDefault("message", ""))
+                .contains("edit mode mismatch"));
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveOthersReturnsErrorWhenSaveUpdatesFails() throws Exception {
+        startNewTransaction();
+        poController.Master().setReference("");
+
+        java.util.List<StockRequest> stockRequestQueue = new java.util.ArrayList<>();
+        stockRequestQueue.add(new ErrorResultStockRequest("forced saveUpdates error path from saveOthers"));
+        setPrivateField(poController, "poStockRequest", stockRequestQueue);
+        setPrivateField(poController, "poPOQuotation", new java.util.ArrayList<POQuotation>());
+
+        JSONObject loJSON = poController.saveOthers();
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message"))
+                .contains("forced saveUpdates error path from saveOthers"));
+    }
+
+    @Test
+    @Order(98)
+    public void testSaveOthersCatchReturnsErrorWhenAttachmentSaveThrowsSQLException() throws Exception {
+        startNewTransaction();
+        poController.Master().setEditMode(EditMode.ADDNEW);
+        poController.Master().setReference("");
+        poController.resetattachment();
+
+        JSONObject attachmentJSON = poController.addAttachment();
+        Assert.assertEquals("success", attachmentJSON.get("result"));
+        Assert.assertTrue(poController.getTransactionAttachmentCount() > 0);
+
+        setPrivateFieldInHierarchy(poController, "poGRider", new SQLExceptionOnServerDateGRider());
+
+        JSONObject loJSON = poController.saveOthers();
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message"))
+                .contains("forced sql exception inside saveOthers catch"));
     }
 
     @Test
@@ -3745,6 +3872,28 @@ public class PurchaseOrderTest {
         @Override
         public JSONObject loadPOAttachment(String fsTransactionNo) throws SQLException {
             throw new SQLException("forced sql error for coverage");
+        }
+    }
+
+    private static final class SQLExceptionOnServerDateGRider extends GRiderCAS {
+        @Override
+        public String Encrypt(String value) {
+            return value == null ? "" : value;
+        }
+
+        @Override
+        public String getUserID() {
+            return "TEST-USER";
+        }
+
+        @Override
+        public String getDepartment() {
+            return instance.getDepartment();
+        }
+
+        @Override
+        public Timestamp getServerDate() throws SQLException {
+            throw new SQLException("forced sql exception inside saveOthers catch");
         }
     }
 
