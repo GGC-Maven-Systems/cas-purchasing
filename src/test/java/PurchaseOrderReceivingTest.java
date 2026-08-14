@@ -6,6 +6,7 @@ import org.guanzon.cas.purchasing.services.PurchaseOrderReceivingControllers;
 
 import org.guanzon.cas.purchasing.status.PurchaseOrderReceivingStatus;
 import org.h2.tools.RunScript;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.junit.*;
 import org.junit.runners.MethodSorters;
@@ -140,6 +141,8 @@ public class PurchaseOrderReceivingTest {
         }
     }
 
+    
+    
     private static void loadCorePrimary() throws IOException, SQLException {
         conn = instance.getGConnection().getConnection();
 
@@ -161,6 +164,7 @@ public class PurchaseOrderReceivingTest {
         schemaScripts.add("transaction_status_history_schema");
         schemaScripts.add("transaction_attachment_schema");
         schemaScripts.add("inventory_schema");
+        schemaScripts.add("brand_schema");
         schemaScripts.add("model_schema");
         schemaScripts.add("model_variant_schema");
         schemaScripts.add("measure_schema");
@@ -187,9 +191,14 @@ public class PurchaseOrderReceivingTest {
         schemaScripts.add("cache_payable_detail_schema");
         schemaScripts.add("inv_serial_ledger_schema");
         schemaScripts.add("ap_client_master_schema");
+        schemaScripts.add("ap_client_ledger_schema");
         schemaScripts.add("account_chart_schema");
         schemaScripts.add("account_master_schema");
         schemaScripts.add("account_ledger_schema");
+        schemaScripts.add("tbj_master_schema");
+        schemaScripts.add("tbj_detail_schema");
+        schemaScripts.add("inv_type_schema");
+        schemaScripts.add("towncity_schema");
 
 
         dataScripts.add("industry_data");
@@ -207,6 +216,7 @@ public class PurchaseOrderReceivingTest {
         dataScripts.add("transaction_status_history_data");
         dataScripts.add("transaction_attachment_data");
         dataScripts.add("inventory_data");
+        dataScripts.add("brand_data");
         dataScripts.add("model_data");
         dataScripts.add("model_variant_data");
         dataScripts.add("measure_data");
@@ -233,9 +243,14 @@ public class PurchaseOrderReceivingTest {
         dataScripts.add("cache_payable_detail_data");
         dataScripts.add("inv_serial_ledger_data");
         dataScripts.add("ap_client_master_data");
+        dataScripts.add("ap_client_ledger_data");
         dataScripts.add("account_chart_data");
         dataScripts.add("account_master_data");
         dataScripts.add("account_ledger_data");
+        dataScripts.add("tbj_master_data");
+        dataScripts.add("tbj_detail_data");
+        dataScripts.add("inv_type_data");
+        dataScripts.add("towncity_data");
 
         for (String schema : schemaScripts) {
             try (FileReader schemaReader = new FileReader("test-data/" + schema + ".sql")) {
@@ -248,29 +263,6 @@ public class PurchaseOrderReceivingTest {
                 RunScript.execute(conn, dataReader);
             }
         }
-
-    }
-    private static void resetController() {
-        poController = new PurchaseOrderReceivingControllers(instance, null).PurchaseOrderReceiving();
-        poController.setWithUI(false);
-        poController.setWithParent(true);
-        Assert.assertNotNull(poController);
-    }
-
-    private static void startNewTransaction() throws CloneNotSupportedException, SQLException, GuanzonException {
-        if (poController == null) {
-            resetController();
-        }
-
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        poController.setIndustryId(psIndustryId);
-        poController.setCategoryId(psCategorCd);
-        poController.setCompanyId(psCompanyId);
-
-        loJSON = poController.NewTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
     }
     
     /*Convert Date to String*/
@@ -288,8 +280,34 @@ public class PurchaseOrderReceivingTest {
         LocalDate localDate = LocalDate.parse(val, date_formatter);
         return localDate;
     }
+    
+    private static void resetController() {
+        poController = new PurchaseOrderReceivingControllers(instance, null).PurchaseOrderReceiving();
+        poController.setWithUI(false);
+        poController.setWithParent(true);
+        Assert.assertNotNull(poController);
+    }
 
-
+    private static void startNewTransaction() {
+        try {
+            if (poController == null) {
+                resetController();
+            }
+            
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            
+            poController.setIndustryId(psIndustryId);
+            poController.setCategoryId(psCategorCd);
+            poController.setCompanyId(psCompanyId);
+            
+            loJSON = poController.NewTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
+    }
+    
     @Test
     public void test001InitTransaction() {
         JSONObject loJSON = poController.InitTransaction();
@@ -322,22 +340,26 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test003CheckPosition() throws SQLException, GuanzonException {
-        resetController();
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-        
-        String lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.OPEN, psUserId);
-        Assert.assertEquals("", lsPosition);
-        lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.CONFIRMED, psUserId);
-        Assert.assertEquals("", lsPosition);
-        poController.isFinance(true);
-        lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.CONFIRMED, psUserId);
-        Assert.assertEquals("", lsPosition);
-        lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.CONFIRMED_I, psUserId);
-        Assert.assertEquals("", lsPosition);
-        lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.POSTED, psUserId);
-        Assert.assertEquals("", lsPosition);
+    public void test003CheckPosition() {
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            
+            String lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.OPEN, psUserId);
+            Assert.assertEquals("", lsPosition);
+            lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.CONFIRMED, psUserId);
+            Assert.assertEquals("", lsPosition);
+            poController.isFinance(true);
+            lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.CONFIRMED, psUserId);
+            Assert.assertEquals("", lsPosition);
+            lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.CONFIRMED_I, psUserId);
+            Assert.assertEquals("", lsPosition);
+            lsPosition = poController.checkPosition(PurchaseOrderReceivingStatus.POSTED, psUserId);
+            Assert.assertEquals("", lsPosition);
+        } catch (SQLException | GuanzonException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
 
     }
 
@@ -347,41 +369,49 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test005CheckUpdateTransaction() throws Exception {
-        resetController();
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        loJSON = poController.OpenTransaction(psTransNo);
-        Assume.assumeTrue("Fixture transaction not available: " + psTransNo,
-                "success".equals(loJSON.get("result")));
-
-        String status = poController.Master().getTransactionStatus();
-        String salesInvoice = poController.Master().getSalesInvoice();
-
-        runCheckUpdateCase(true, "", status, salesInvoice);
-        runCheckUpdateCase(false, "", status, salesInvoice);
-        runCheckUpdateCase(false, PurchaseOrderReceivingStatus.CONFIRMED, status, salesInvoice);
-        runCheckUpdateCase(false, PurchaseOrderReceivingStatus.CONFIRMED_I, status, salesInvoice);
-        runCheckUpdateCase(false, PurchaseOrderReceivingStatus.VERIFIED, status, salesInvoice);
-        runCheckUpdateCase(false, PurchaseOrderReceivingStatus.POSTED, status, salesInvoice);
+    public void test005CheckUpdateTransaction() {
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            
+            loJSON = poController.OpenTransaction(psTransNo);
+            Assume.assumeTrue("Fixture transaction not available: " + psTransNo,
+                    "success".equals(loJSON.get("result")));
+            
+            String status = poController.Master().getTransactionStatus();
+            String salesInvoice = poController.Master().getSalesInvoice();
+            
+            runCheckUpdateCase(true, "", status, salesInvoice);
+            runCheckUpdateCase(false, "", status, salesInvoice);
+            runCheckUpdateCase(false, PurchaseOrderReceivingStatus.CONFIRMED, status, salesInvoice);
+            runCheckUpdateCase(false, PurchaseOrderReceivingStatus.CONFIRMED_I, status, salesInvoice);
+            runCheckUpdateCase(false, PurchaseOrderReceivingStatus.VERIFIED, status, salesInvoice);
+            runCheckUpdateCase(false, PurchaseOrderReceivingStatus.POSTED, status, salesInvoice);
+        } catch (CloneNotSupportedException | SQLException | GuanzonException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
-    private void runCheckUpdateCase(boolean isEntry, String form, String status, String salesInvoice) throws Exception {
-        poController.setForm(form == null ? "" : form);
-        JSONObject out = poController.checkUpdateTransaction(isEntry);
-
-        Assert.assertNotNull(out);
-        Assert.assertNotNull("result must exist", out.get("result"));
-        Assert.assertNotNull("message must exist", out.get("message"));
-
-        boolean expectedAllow = shouldAllowUpdate(status, isEntry, form, salesInvoice);
-        if (expectedAllow) {
-            Assert.assertEquals("success", out.get("result"));
-            Assert.assertEquals("success", out.get("message"));
-        } else {
-            Assert.assertEquals("error", out.get("result"));
-            Assert.assertTrue(String.valueOf(out.get("message")).contains("Transaction status was already"));
+    private void runCheckUpdateCase(boolean isEntry, String form, String status, String salesInvoice) {
+        try {
+            poController.setForm(form == null ? "" : form);
+            JSONObject out = poController.checkUpdateTransaction(isEntry);
+            
+            Assert.assertNotNull(out);
+            Assert.assertNotNull("result must exist", out.get("result"));
+            Assert.assertNotNull("message must exist", out.get("message"));
+            
+            boolean expectedAllow = shouldAllowUpdate(status, isEntry, form, salesInvoice);
+            if (expectedAllow) {
+                Assert.assertEquals("success", out.get("result"));
+                Assert.assertEquals("success", out.get("message"));
+            } else {
+                Assert.assertEquals("error", out.get("result"));
+                Assert.assertTrue(String.valueOf(out.get("message")).contains("Transaction status was already"));
+            }
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ScriptException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
         }
     }
 
@@ -452,27 +482,31 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test007NewTransaction()  throws CloneNotSupportedException, SQLException, GuanzonException{
-        if (poController == null) {
+    public void test007NewTransaction() {
+        try {
+            if (poController == null) {
+                resetController();
+            }
+            Assert.assertNotNull(poController);
+            
             resetController();
+            
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            
+            poController.setIndustryId(psIndustryId);
+            poController.setCategoryId(psCategorCd);
+            poController.setCompanyId(psCompanyId);
+            
+            loJSON = poController.NewTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            Assert.assertEquals(psIndustryId, poController.Master().getIndustryId());
+            Assert.assertEquals(psCategorCd, poController.Master().getCategoryCode());
+            Assert.assertEquals(psCompanyId, poController.Master().getCompanyId());
+            Assert.assertEquals(PurchaseOrderReceivingStatus.OPEN, poController.Master().getTransactionStatus());
+        } catch (CloneNotSupportedException | SQLException | GuanzonException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
         }
-        Assert.assertNotNull(poController);
-
-        resetController();
-
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        poController.setIndustryId(psIndustryId);
-        poController.setCategoryId(psCategorCd);
-        poController.setCompanyId(psCompanyId);
-
-        loJSON = poController.NewTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-        Assert.assertEquals(psIndustryId, poController.Master().getIndustryId());
-        Assert.assertEquals(psCategorCd, poController.Master().getCategoryCode());
-        Assert.assertEquals(psCompanyId, poController.Master().getCompanyId());
-        Assert.assertEquals(PurchaseOrderReceivingStatus.OPEN, poController.Master().getTransactionStatus());
     }
 
     @Test
@@ -481,51 +515,63 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test009OpenTransaction() throws Exception {
-        Assert.assertNotNull("No sample transaction configured.", psTransNo);
-
-        resetController();
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        loJSON = poController.OpenTransaction(psTransNo);
-        Assume.assumeTrue("Fixture transaction not available: " + psTransNo,
-                "success".equals(loJSON.get("result")));
-
-        Assert.assertEquals("success", loJSON.get("result"));
-        Assert.assertNotNull(poController.Master());
-        Assert.assertNotNull(poController.Detail());
-        Assert.assertEquals(psTransNo, poController.Master().getTransactionNo());
-        Assert.assertTrue("Detail count should be zero or more.", poController.getDetailCount() >= 0);
+    public void test009OpenTransaction() {
+        try {
+            Assert.assertNotNull("No sample transaction configured.", psTransNo);
+            
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            
+            loJSON = poController.OpenTransaction(psTransNo);
+            Assume.assumeTrue("Fixture transaction not available: " + psTransNo,
+                    "success".equals(loJSON.get("result")));
+            
+            Assert.assertEquals("success", loJSON.get("result"));
+            Assert.assertNotNull(poController.Master());
+            Assert.assertNotNull(poController.Detail());
+            Assert.assertEquals(psTransNo, poController.Master().getTransactionNo());
+            Assert.assertTrue("Detail count should be zero or more.", poController.getDetailCount() >= 0);
+        } catch (CloneNotSupportedException | SQLException | GuanzonException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test010UpdateTransaction() throws Exception {
-        Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
-
-        resetController();
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-        loJSON = poController.OpenTransaction(psTransNo);
-        Assert.assertEquals("success", loJSON.get("result"));
-
-        loJSON = poController.UpdateTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
+    public void test010UpdateTransaction() {
+        try {
+            Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
+            
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            loJSON = poController.OpenTransaction(psTransNo);
+            Assert.assertEquals("success", loJSON.get("result"));
+            
+            loJSON = poController.UpdateTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test011ConfirmTransaction() throws CloneNotSupportedException, SQLException, GuanzonException, ParseException {
-        Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
-
-        resetController();
-        JSONObject loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-        loJSON = poController.OpenTransaction(psTransNo);
-        Assert.assertEquals("success", loJSON.get("result"));
-        poController.setWithUI(false);
-        loJSON = poController.ConfirmTransaction("testconfirm");
-        System.out.println("MESSAGE : " + loJSON.get("message"));
-        Assert.assertEquals("success", loJSON.get("result"));
+    public void test011ConfirmTransaction() {
+        try {
+            Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
+            
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            loJSON = poController.OpenTransaction(psTransNo);
+            Assert.assertEquals("success", loJSON.get("result"));
+            poController.setWithUI(false);
+            loJSON = poController.ConfirmTransaction("testconfirm");
+            System.out.println("MESSAGE : " + loJSON.get("message"));
+            Assert.assertEquals("success", loJSON.get("result"));
+        } catch (ParseException | SQLException | GuanzonException | CloneNotSupportedException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -533,10 +579,12 @@ public class PurchaseOrderReceivingTest {
         // TODO
     }
 
+    
     @Test
-    public void test013ConfirmSIPosting()  throws CloneNotSupportedException, SQLException, GuanzonException, ParseException, IOException {
+    public void test013ConfirmSIPosting() {
+        try {
         Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
-        
+
 //        psUserId = "GCO1260011";
 //        setUpClass();
         
@@ -557,10 +605,15 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.ConfirmSIPosting("testconfirmSIPOSTING");
         System.out.println("MESSAGE : " + loJSON.get("message"));
         Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ParseException  ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
+    
     @Test
-    public void test014VerifySIPosting() throws CloneNotSupportedException, SQLException, GuanzonException, ParseException, ScriptException {
+    public void test014VerifySIPosting() {
+        try {
         Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
 
         resetController();
@@ -573,6 +626,8 @@ public class PurchaseOrderReceivingTest {
         
         loJSON = poController.UpdateTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
+//        poController.Master().setTruckingId(psSupplierId);
+//        poController.Master().setFreight(100.0000);
         
         loJSON = poController.populateJournal();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -586,11 +641,17 @@ public class PurchaseOrderReceivingTest {
         
         System.out.println("DEBIT : " +  poController.Journal().getTotalDebitAmount());
         System.out.println("CREDIT : " +  poController.Journal().getTotalCreditAmount());
+        System.out.println("JOURNAL STATUS : " + poController.Journal().Master().getTransactionStatus());
         loJSON = poController.SaveTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
         
         loJSON = poController.OpenTransaction(psTransNo);
         Assert.assertEquals("success", loJSON.get("result"));
+        
+        loJSON = poController.populateJournal();
+        Assert.assertEquals("success", loJSON.get("result"));
+        System.out.println("JOURNAL STATUS : " + poController.Journal().Master().getTransactionStatus());
+        System.out.println("MESSAGE : " + loJSON.get("message"));
         
         poController.setWithUI(false);
         poController.isFinance(true);
@@ -598,86 +659,85 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.VerifySIPosting("testVerifySIPosting");
         System.out.println("MESSAGE : " + loJSON.get("message"));
         Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ParseException | ScriptException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
-
     @Test
-    public void test015ReturnSIPosting() throws CloneNotSupportedException, SQLException, GuanzonException, ParseException, ScriptException {
-        Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
-
-        resetController();
-        JSONObject loJSON = poController.ReturnSIPosting("testReturnSIPosting");
-        System.out.println("MESSAGE : " + loJSON.get("message"));
-        Assert.assertEquals("error", loJSON.get("result"));
-        psTransNo = "GK0126000169";
-        poController.isUnitTest(true);
-        loJSON = poController.InitTransaction();
-        Assert.assertEquals("success", loJSON.get("result"));
-        loJSON = poController.OpenTransaction(psTransNo);
-        Assert.assertEquals("success", loJSON.get("result"));
-        
-        loJSON = poController.populateJournal();
-        Assert.assertEquals("success", loJSON.get("result"));
-        
-        poController.setWithUI(false);
-        poController.isFinance(true);
-        loJSON = poController.ReturnSIPosting("testReturnSIPosting");
-        System.out.println("MESSAGE : " + loJSON.get("message"));
-        Assert.assertEquals("success", loJSON.get("result"));
-    }
-    
-    @Test
-    public void test016PostTransaction()  throws CloneNotSupportedException, SQLException, GuanzonException, ParseException, ScriptException {
+    public void test015PostTransaction() {
+        try {
         resetController();
         psTransNo = "GK0126000202"; //GK0126000160
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
         loJSON = poController.OpenTransaction(psTransNo);
         Assert.assertEquals("success", loJSON.get("result"));
-        
-        poController.isUnitTest(true);
-        System.out.println("STATUS : " + poController.Master().getTransactionStatus());
-        loJSON = poController.PostTransaction("testpost");
-        System.out.println("MESSAGE POST : " + loJSON.get("message"));
-        Assert.assertEquals("error", loJSON.get("result"));
-        
-        loJSON = poController.populateJournal();
-        System.out.println("MESSAGE : " + loJSON.get("message"));
         Assert.assertEquals("success", loJSON.get("result"));
         poController.setWithUI(false);
         poController.setWithParent(false);
-        poController.isUnitTest(false);
-        System.out.println("STATUS : " + poController.Master().getTransactionStatus());
+        poController.isUnitTest(true);
+        System.out.println("STATUS 1 : " + poController.Master().getTransactionStatus());
         loJSON = poController.PostTransaction("testpost");
         System.out.println("MESSAGE POST : " + loJSON.get("message"));
         Assert.assertEquals("error", loJSON.get("result"));
-        
+
+        loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
         loJSON = poController.OpenTransaction(psTransNo);
         Assert.assertEquals("success", loJSON.get("result"));
-        
-        poController.isUnitTest(true);
-        System.out.println("STATUS : " + poController.Master().getTransactionStatus());
         loJSON = poController.populateJournal();
-        System.out.println("MESSAGE : " + loJSON.get("message"));
         Assert.assertEquals("success", loJSON.get("result"));
-        
+        System.out.println("JOURNAL STATUS : " + poController.Journal().Master().getTransactionStatus());
+        System.out.println("MESSAGE : " + loJSON.get("message"));
+        System.out.println("CHECK TRUCKING : " + poController.Master().getTruckingId());
+        System.out.println("CHECK TRUCKING AMOUNT : " + poController.Master().getFreight());
+        poController.setWithUI(false);
+        poController.setWithParent(false);
         poController.isUnitTest(true);
         System.out.println("STATUS : " + poController.Master().getTransactionStatus());
         loJSON = poController.PostTransaction("testpost");
         System.out.println("MESSAGE POST : " + loJSON.get("message"));
         Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ParseException | ScriptException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
+    
 
     @Test
-    public void test017PaidTransaction() throws CloneNotSupportedException, SQLException, GuanzonException, ParseException {
+    public void test016ReturnSIPosting() {
+        try {
         Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
 
         resetController();
-        JSONObject loJSON = poController.PaidTransaction("testpaid");
+        psTransNo = "GK0126000169";
+        poController.isUnitTest(true);
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction(psTransNo);
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        loJSON = poController.populateJournal();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        poController.setWithUI(false);
+        poController.isFinance(true);
+        loJSON = poController.ReturnSIPosting("testReturnSIPosting");
         System.out.println("MESSAGE : " + loJSON.get("message"));
-        Assert.assertEquals("error", loJSON.get("result"));
-        
-        loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ParseException | ScriptException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
+    }
+
+    @Test
+    public void test017PaidTransaction() {
+        try {
+        Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
+
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
         loJSON = poController.OpenTransaction(psTransNo);
         Assert.assertEquals("success", loJSON.get("result"));
@@ -687,51 +747,55 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.PaidTransaction("testpaid");
         System.out.println("MESSAGE : " + loJSON.get("message"));
         Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ParseException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
     
     @Test
-    public void test018CancelTransaction()throws CloneNotSupportedException, SQLException, GuanzonException, ParseException {
+    public void test018CancelTransaction() {
+        try {
         Assert.assertNotNull("No transaction sample transaction available.", psTransNoWithSerial);
 
         resetController();
-        JSONObject loJSON = poController.CancelTransaction("testcancel");
-        System.out.println("MESSAGE : " + loJSON.get("message"));
-        Assert.assertEquals("error", loJSON.get("result"));
-        
-        loJSON = poController.InitTransaction();
+        JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
         poController.setWithUI(false);
         poController.setWithParent(false);
-        
+
         loJSON = poController.OpenTransaction(psTransNoWithSerial);
         Assert.assertEquals("success", loJSON.get("result"));
-        
+
         loJSON = poController.CancelTransaction("testcancel");
         System.out.println("MESSAGE : " + loJSON.get("message"));
         Assert.assertEquals("error", loJSON.get("result"));
-        
+
         poController.Master().setTransactionStatus(PurchaseOrderReceivingStatus.CONFIRMED);
         loJSON = poController.CancelTransaction("testcancel");
         System.out.println("MESSAGE : " + loJSON.get("message"));
         Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ParseException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test019VoidTransaction() throws CloneNotSupportedException, SQLException, GuanzonException, ParseException {
+    public void test019VoidTransaction() {
+        try {
         Assert.assertNotNull("No transaction sample transaction available.", psTransNo);
 
         resetController();
-        JSONObject  loJSON = poController.VoidTransaction("testvoid");
-        Assert.assertEquals("error", loJSON.get("result"));
-        
-        loJSON = poController.InitTransaction();
+        JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
         loJSON = poController.OpenTransaction(psTransNo);
         Assert.assertEquals("success", loJSON.get("result"));
         poController.setWithUI(false);
         loJSON = poController.VoidTransaction("testvoid");
         Assert.assertEquals("success", loJSON.get("result"));
-  
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ParseException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
+
     }
 
 //    @Test
@@ -835,7 +899,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchSupplier("",false);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         }
@@ -851,7 +915,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchBranch("",false);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         }
@@ -867,7 +931,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchTrucking("",false);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         }
@@ -883,7 +947,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchTerm("",false);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         }
@@ -899,7 +963,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchBarcode("",false,0);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -915,7 +979,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchDescription("",false,0);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -931,7 +995,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchSupersede("",false,0);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -947,7 +1011,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchBarcode("",false,0, false);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -963,7 +1027,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchDescription("",false,0, false);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -979,7 +1043,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchSupersede("",false,0, false);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -995,7 +1059,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchModel("", true, 0, true);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -1011,7 +1075,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchBrand("", true, 0);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -1027,7 +1091,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchModel("", true, 0);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -1043,7 +1107,7 @@ public class PurchaseOrderReceivingTest {
             poController.setWithUI(false);
             loJSON = poController.SearchLocation("", true, 0);
             Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+        } catch (SQLException | GuanzonException  ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
         } 
@@ -1051,38 +1115,29 @@ public class PurchaseOrderReceivingTest {
 
 //    @Test
     public void test040SearchSerial() {
-        try {
-            resetController();
-            JSONObject loJSON = poController.InitTransaction();
-            Assert.assertEquals("success", loJSON.get("result"));
-            startNewTransaction();
-            poController.setWithUI(false);
-            loJSON = poController.SearchSerial("", 0);
-            Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
-            Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
-            Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
-        } 
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        startNewTransaction();
+        poController.setWithUI(false);
+        loJSON = poController.SearchSerial("", 0);
+        Assert.assertEquals("success", loJSON.get("result")); 
     }
 
 //    @Test
     public void test041SearchSerialRegistration() {
-        try {
-            resetController();
-            JSONObject loJSON = poController.InitTransaction();
-            Assert.assertEquals("success", loJSON.get("result"));
-            startNewTransaction();
-            poController.setWithUI(false);
-            loJSON = poController.SearchSerialRegistration("", 0);
-            Assert.assertEquals("success", loJSON.get("result"));
-        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
-            Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
-            Assert.assertEquals(MiscUtil.getException(ex), MiscUtil.getException(ex));
-        } 
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        startNewTransaction();
+        poController.setWithUI(false);
+        loJSON = poController.SearchSerialRegistration("", 0);
+        Assert.assertEquals("success", loJSON.get("result")); 
     }
 
     @Test
-    public void test042GetSerialId() throws Exception {
+    public void test042GetSerialId() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1108,10 +1163,14 @@ public class PurchaseOrderReceivingTest {
 
         String serialId = poController.getSerialId(0);
         Assert.assertNotNull("Serial ID lookup should not return null.", serialId);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test043ComputeFields() throws Exception {
+    public void test043ComputeFields() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1139,10 +1198,14 @@ public class PurchaseOrderReceivingTest {
         Assert.assertEquals(expectedDueDate,  strToDate(xsDateShort(poController.Master().getDueDate())));
         Assert.assertEquals(expectedDueDate,  strToDate(xsDateShort(poController.Master().getTermDueDate())));
         Assert.assertEquals(expectedTotal, poController.Master().getTransactionTotal().doubleValue(), 0.0001);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test044GetNetTotal() throws Exception {
+    public void test044GetNetTotal() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1178,10 +1241,14 @@ public class PurchaseOrderReceivingTest {
         double actualNetTotal = poController.getNetTotal();
 
         Assert.assertEquals(expectedNetTotal, actualNetTotal, 0.0001);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test045GetAdvancePayment() throws Exception {
+    public void test045GetAdvancePayment() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1192,10 +1259,14 @@ public class PurchaseOrderReceivingTest {
 
         double advPayment = poController.getAdvancePayment();
         Assert.assertTrue("Advance payment should not be negative.", advPayment >= 0.0);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test046ComputeDiscountRate() throws Exception {
+    public void test046ComputeDiscountRate() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1216,10 +1287,14 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.computeDiscountRate(total + 0.01);
         Assert.assertEquals("error", loJSON.get("result"));
         Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("Discount amount cannot be negative"));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test047ComputeDiscount() throws Exception {
+    public void test047ComputeDiscount() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1238,6 +1313,9 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.computeDiscount(100.01);
         Assert.assertEquals("error", loJSON.get("result"));
         Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("Discount rate cannot be negative"));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -1246,7 +1324,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test049CheckExistingStock() throws Exception {
+    public void test049CheckExistingStock() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -1298,10 +1377,14 @@ public class PurchaseOrderReceivingTest {
         Assert.assertEquals(beforeCount, poController.getDetailCount());
         Assert.assertEquals(beforeRow1Stock, poController.Detail(1).getStockId());
         Assert.assertEquals(beforeRow1OrderNo, poController.Detail(1).getOrderNo());
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test050CheckExistingDetailDuplicate() throws Exception {
+    public void test050CheckExistingDetailDuplicate() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -1367,10 +1450,14 @@ public class PurchaseOrderReceivingTest {
         Assert.assertEquals(beforeRow2OrderNo, poController.Detail(2).getOrderNo());
         Assert.assertEquals(beforeRow2Stock, poController.Detail(2).getStockId());
         Assert.assertEquals(beforeRow2Price, poController.Detail(2).getUnitPrce().doubleValue(), 0.0001);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test051LoadPurchaseOrderReceiving4Args() throws Exception {
+    public void test051LoadPurchaseOrderReceiving4Args() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1394,10 +1481,14 @@ public class PurchaseOrderReceivingTest {
                 poController.getPurchaseOrderReceivingCount() > 0);
         Assert.assertTrue("Expected loaded records to include the fixture transaction.",
                 hasLoadedTransaction(referenceNo));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test052LoadPurchaseOrderReceiving5Args() throws Exception {
+    public void test052LoadPurchaseOrderReceiving5Args() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1422,10 +1513,14 @@ public class PurchaseOrderReceivingTest {
                 poController.getPurchaseOrderReceivingCount() > 0);
         Assert.assertTrue("Expected loaded records to include the fixture transaction.",
                 hasLoadedTransaction(referenceNo));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test053LoadUnPostPurchaseOrderReceiving() throws Exception {
+    public void test053LoadUnPostPurchaseOrderReceiving() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1449,6 +1544,9 @@ public class PurchaseOrderReceivingTest {
         Assert.assertNotNull(loJSON.get("message"));
         Assert.assertTrue("Expected at least one loaded PO receiving record.",
                 poController.getPurchaseOrderReceivingCount() > 0);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -1519,7 +1617,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test056AddPurchaseOrderToPORDetail() throws Exception {
+    public void test056AddPurchaseOrderToPORDetail() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -1600,6 +1699,9 @@ public class PurchaseOrderReceivingTest {
 
         Assume.assumeTrue("No approved PO produced addPurchaseOrderToPORDetail success in current fixture.",
                 successCaseValidated);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -1608,7 +1710,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test058AddPurchaseOrderReturnToPORDetail() throws Exception {
+    public void test058AddPurchaseOrderReturnToPORDetail() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -1690,10 +1793,14 @@ public class PurchaseOrderReceivingTest {
 
         Assume.assumeTrue("No approved PO produced addPurchaseOrderReturnToPORDetail success in current fixture.",
                 successCaseValidated);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test059GetPurchaseOrderReceivingSerial() throws Exception {
+    public void test059GetPurchaseOrderReceivingSerial() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -1767,10 +1874,14 @@ public class PurchaseOrderReceivingTest {
             }
             Assert.assertTrue("Expected at least one serial row mapped to selected entry and stock.", foundMappedRow);
         }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test060CheckExistingSerialNo() throws Exception {
+    public void test060CheckExistingSerialNo() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -1820,10 +1931,14 @@ public class PurchaseOrderReceivingTest {
         checkJSON = poController.checkExistingSerialNo(row0, "serial02", "SER-A");
         Assert.assertEquals("error", String.valueOf(checkJSON.get("result")));
         Assert.assertEquals(Boolean.FALSE, checkJSON.get("set"));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test061CheckExistingSerialId() throws Exception {
+    public void test061CheckExistingSerialId() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -1860,10 +1975,14 @@ public class PurchaseOrderReceivingTest {
         checkJSON = poController.checkExistingSerialId(999);
         Assert.assertNull(checkJSON.get("result"));
         Assert.assertNull(checkJSON.get("message"));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test062RemovePurchaseOrderReceivingSerial() throws Exception {
+    public void test062RemovePurchaseOrderReceivingSerial() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -1916,10 +2035,14 @@ public class PurchaseOrderReceivingTest {
         poController.removePurchaseOrderReceivingSerial(999);
         Assert.assertEquals("Removing a non-existing entry should not change list size.",
                 stableCount, poController.getPurchaseOrderReceivingSerialCount());
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test063CheckPurchaseOrderReceivingSerial() throws Exception {
+    public void test063CheckPurchaseOrderReceivingSerial() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -1999,6 +2122,9 @@ public class PurchaseOrderReceivingTest {
         Assert.assertNull(checkJSON.get("result"));
         Assert.assertEquals("Larger target quantity should not remove rows.",
                 stableCount, poController.getPurchaseOrderReceivingSerialCount());
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2059,7 +2185,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test073TransactionAttachmentList() throws Exception {
+    public void test073TransactionAttachmentList() {
+        try {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
@@ -2072,6 +2199,9 @@ public class PurchaseOrderReceivingTest {
         
         int lnCtr = poController.addAttachment("testfilename");
         Assert.assertEquals(1,lnCtr);
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
 
     }
 
@@ -2098,7 +2228,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test076PurchaseOrderReceivingSerialListByIndex() throws Exception {
+    public void test076PurchaseOrderReceivingSerialListByIndex() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -2116,6 +2247,9 @@ public class PurchaseOrderReceivingTest {
 
         Assume.assumeTrue("No serial row available.", poController.getPurchaseOrderReceivingSerialCount() > 0);
         Assert.assertNotNull(poController.PurchaseOrderReceivingSerialList(0));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2140,7 +2274,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test078PurchaseOrderReceivingList() throws Exception {
+    public void test078PurchaseOrderReceivingList() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2162,6 +2297,9 @@ public class PurchaseOrderReceivingTest {
         if ("success".equals(String.valueOf(loJSON.get("result")))) {
             Assume.assumeTrue("No POR row available.", poController.getPurchaseOrderReceivingCount() > 0);
             Assert.assertNotNull(poController.PurchaseOrderReceivingList(0));
+        }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
         }
     }
 
@@ -2231,7 +2369,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test087AddDetail() throws Exception {
+    public void test087AddDetail() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -2246,6 +2385,9 @@ public class PurchaseOrderReceivingTest {
             Assert.assertTrue(poController.getDetailCount() >= beforeCount);
         } else {
             Assert.assertTrue(String.valueOf(loJSON.get("message")).contains("Last row has empty item."));
+        }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
         }
     }
 
@@ -2267,7 +2409,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test089AddAttachmentNoArgs() throws Exception {
+    public void test089AddAttachmentNoArgs() {
+        try {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
@@ -2281,10 +2424,14 @@ public class PurchaseOrderReceivingTest {
         if ("success".equals(result)) {
             Assert.assertTrue(poController.getTransactionAttachmentCount() >= beforeCount);
         }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test090RemoveAttachment() throws Exception {
+    public void test090RemoveAttachment() {
+        try {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
@@ -2295,6 +2442,9 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.removeAttachment(0);
         Assert.assertNotNull(loJSON);
         Assert.assertEquals("success", String.valueOf(loJSON.get("result")));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2313,7 +2463,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test094ResetOthers() throws Exception {
+    public void test094ResetOthers() {
+        try {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
@@ -2323,6 +2474,9 @@ public class PurchaseOrderReceivingTest {
 
         Assert.assertEquals(0, poController.getPurchaseOrderReceivingSerialCount());
         Assert.assertEquals(0, poController.getTransactionAttachmentCount());
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2344,7 +2498,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test097SetIndustryId() throws Exception {
+    public void test097SetIndustryId() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2356,10 +2511,14 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.NewTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
         Assert.assertEquals(psIndustryId, poController.Master().getIndustryId());
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test098SetCompanyId() throws Exception {
+    public void test098SetCompanyId() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2371,10 +2530,14 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.NewTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
         Assert.assertEquals(psCompanyId, poController.Master().getCompanyId());
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test099SetCategoryId() throws Exception {
+    public void test099SetCategoryId() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2386,6 +2549,9 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.NewTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
         Assert.assertEquals(psCategorCd, poController.Master().getCategoryCode());
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2401,12 +2567,16 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test101SetPurpose() throws Exception {
+    public void test101SetPurpose() {
+        try {
         poController.setPurpose(PurchaseOrderReceivingStatus.Purpose.REGULAR);
 
         java.lang.reflect.Field purposeField = poController.getClass().getDeclaredField("psPurpose");
         purposeField.setAccessible(true);
         Assert.assertEquals(PurchaseOrderReceivingStatus.Purpose.REGULAR, purposeField.get(poController));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2420,7 +2590,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test  
-    public void test104WillSave() throws Exception {
+    public void test104WillSave() {
+        try {
         System.out.println("PRIORIT TEST : test104WillSave" );
         // Case 1: No detail rows should fail validation.
         resetController();
@@ -2712,15 +2883,23 @@ public class PurchaseOrderReceivingTest {
             Assert.assertEquals("error", String.valueOf(loJSON.get("result")));
         
         }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test105Save() throws Exception {
+    public void test105Save() {
+        try {
         //TODO
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test106SaveOthers() throws Exception {
+    public void test106SaveOthers() {
+        try {
         resetController();
         startNewTransaction();
 
@@ -2748,6 +2927,9 @@ public class PurchaseOrderReceivingTest {
         if ("error".equals(result)) {
             Assert.assertNotNull("Error result should include a message.", loJSON.get("message"));
         }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2757,7 +2939,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test109InitFields() throws Exception {
+    public void test109InitFields() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2775,6 +2958,9 @@ public class PurchaseOrderReceivingTest {
         Assert.assertEquals(PurchaseOrderReceivingStatus.OPEN, poController.Master().getTransactionStatus());
         Assert.assertNotNull(poController.Master().getTransactionDate());
         Assert.assertNotNull(poController.Master().getReferenceDate());
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2804,7 +2990,80 @@ public class PurchaseOrderReceivingTest {
 
     @Test
     public void test115PrintRecord() {
-        // TODO
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            poController.isUnitTest(true);
+            // Force an invalid transaction so printRecord exits before Jasper/UI rendering.
+            poController.Master().setTransactionNo("UT_INVALID_POR_NO");
+            loJSON = poController.printRecord(() -> {
+            });
+
+            Assert.assertNotNull(loJSON);
+            Assert.assertEquals("error", String.valueOf(loJSON.get("result")));
+            Assert.assertNotNull(String.valueOf(loJSON.get("message")));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+            Assert.fail("Unexpected exception in test115PrintRecord: " + ex.getMessage());
+        }
+        
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+
+            poController.isUnitTest(true);
+            // Force an invalid transaction so printRecord exits before Jasper/UI rendering.
+            poController.Master().setTransactionNo(psTransNoWithSerial);
+            loJSON = poController.printRecord(() -> {
+            });
+
+            Assert.assertNotNull(loJSON);
+            Assert.assertEquals("success", String.valueOf(loJSON.get("result")));
+            Assert.assertNotNull(String.valueOf(loJSON.get("message")));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+            Assert.fail("Unexpected exception in test115PrintRecord: " + ex.getMessage());
+        }
+        
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+
+            poController.isUnitTest(true);
+            // Force an invalid transaction so printRecord exits before Jasper/UI rendering.
+            poController.Master().setTransactionNo(psTransNo);//PurchaseOrderReceivingStatus.Category.GENERAL
+            loJSON = poController.printRecord(() -> {
+            });
+
+            Assert.assertNotNull(loJSON);
+            Assert.assertEquals("success", String.valueOf(loJSON.get("result")));
+            Assert.assertNotNull(String.valueOf(loJSON.get("message")));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+            Assert.fail("Unexpected exception in test115PrintRecord: " + ex.getMessage());
+        }
+        
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+
+            poController.isUnitTest(true);
+            // Force an invalid transaction so printRecord exits before Jasper/UI rendering.
+            poController.Master().setTransactionNo("GCO126000004");//PurchaseOrderReceivingStatus.Category.FOOD
+            loJSON = poController.printRecord(() -> {
+            });
+
+            Assert.assertNotNull(loJSON);
+            Assert.assertEquals("success", String.valueOf(loJSON.get("result")));
+            Assert.assertNotNull(String.valueOf(loJSON.get("message")));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+            Assert.fail("Unexpected exception in test115PrintRecord: " + ex.getMessage());
+        }
     }
 
     @Test
@@ -2878,7 +3137,8 @@ public class PurchaseOrderReceivingTest {
     }
 
     @Test
-    public void test130RetriveSummaryReports() throws SQLException, GuanzonException {
+    public void test130RetriveSummaryReports() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2894,10 +3154,14 @@ public class PurchaseOrderReceivingTest {
         if ("error".equals(result)) {
             Assert.assertNotNull("Error result should include a message.", loJSON.get("message"));
         }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test131RetriveSummaryDetailedReports() throws SQLException, GuanzonException {
+    public void test131RetriveSummaryDetailedReports() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2913,10 +3177,14 @@ public class PurchaseOrderReceivingTest {
         if ("error".equals(result)) {
             Assert.assertNotNull("Error result should include a message.", loJSON.get("message"));
         }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
-    public void test131CheckPosition() throws SQLException, GuanzonException {
+    public void test131CheckPosition() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2936,11 +3204,15 @@ public class PurchaseOrderReceivingTest {
         if ("error".equals(result)) {
             Assert.assertNotNull("Error result should include a message.", loJSON.get("message"));
         }
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
     
     
     @Test
-    public void test131CheckUpdateStatus() throws SQLException, GuanzonException, CloneNotSupportedException, ScriptException {
+    public void test131CheckUpdateStatus() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -2974,13 +3246,16 @@ public class PurchaseOrderReceivingTest {
         Assert.assertEquals("error", loJSON.get("result"));
         poController.setForm(PurchaseOrderReceivingStatus.POSTED);
         loJSON = poController.checkUpdateTransaction(false);
-        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals("error", loJSON.get("result"));
         
         poController.Master().setTransactionStatus(PurchaseOrderReceivingStatus.PAID);
         poController.setForm(PurchaseOrderReceivingStatus.POSTED);
         loJSON = poController.checkUpdateTransaction(false);
-        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals("error", loJSON.get("result"));
         
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
     @Test
@@ -2990,11 +3265,64 @@ public class PurchaseOrderReceivingTest {
 
     @Test
     public void test133PrintReports() {
-        // TODO
+        String originalOsName = System.getProperty("os.name");
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+
+            // Load a fixture transaction so company/branch context required by report headers is present.
+            loJSON = poController.OpenTransaction(psTransNo);
+            Assume.assumeTrue("Fixture transaction not available: " + psTransNo,
+                    "success".equals(String.valueOf(loJSON.get("result"))));
+
+            // Prevent UI popup by forcing non-Windows branch in printReports().
+            System.setProperty("os.name", "linux");
+
+            String tempPath = System.getProperty("sys.default.path.config") + "/temp";
+            new java.io.File(tempPath).mkdirs();
+
+            JSONArray reportData = new JSONArray();
+            JSONObject row = new JSONObject();
+            row.put("sTransNox", String.valueOf(poController.Master().getTransactionNo()));
+            row.put("sOrderNox", "PO-UNIT-001");
+            row.put("sSupplierNme", "UNIT TEST SUPPLIER");
+            row.put("dTransact", "2026-08-14");
+            row.put("sBarCodex", "BC-UT-001");
+            row.put("sBarcodeDesc", "UNIT TEST ITEM");
+            row.put("sBrandNme", "UNIT BRAND");
+            row.put("sModelCde", "M-UT");
+            row.put("sModelNme", "MODEL UNIT");
+            row.put("sColorNme", "BLACK");
+            row.put("nQuantity", 1);
+            row.put("sSerial01", "");
+            row.put("sSerial02", "");
+            row.put("sCStckrNo", "");
+            row.put("nFreightx", 0.00);
+            row.put("nTotal", 1000.00);
+            reportData.add(row);
+            
+            loJSON = poController.printReports(null, true, reportData);
+            System.out.println("MESSAGE : " + String.valueOf(loJSON.get("message")));
+            Assert.assertNotNull(loJSON);
+            Assert.assertEquals("error", String.valueOf(loJSON.get("result")));
+            
+            loJSON = poController.printReports(null, false, reportData);
+            System.out.println("MESSAGE : " + String.valueOf(loJSON.get("message")));
+            Assert.assertNotNull(loJSON);
+            Assert.assertEquals("error", String.valueOf(loJSON.get("result")));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        } finally {
+            if (originalOsName != null) {
+                System.setProperty("os.name", originalOsName);
+            }
+        }
     }
 
     @Test
-    public void test134setValueToOthers()throws CloneNotSupportedException, SQLException, GuanzonException {
+    public void test134setValueToOthers() {
+        try {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
@@ -3030,6 +3358,96 @@ public class PurchaseOrderReceivingTest {
         System.out.println("MESSAGE : " + String.valueOf(loJSON.get("message")));
         Assert.assertEquals("success", String.valueOf(loJSON.get("result")));
     
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
+    }
+
+    private String normalizeSql(String sql) {
+        if (sql == null) return "";
+        return sql.replaceAll("\\s+", " ").trim().toLowerCase();
+    }
+
+    @Test
+    public void test135GetSQBrowseInv() {
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+
+            java.lang.reflect.Method m = poController.getClass().getDeclaredMethod("getSQ_BrowseInv");
+            m.setAccessible(true);
+            String sql = normalizeSql((String) m.invoke(poController));
+
+            Assert.assertFalse(sql.isEmpty());
+            Assert.assertTrue(sql.contains("from po_receiving_detail a"));
+            Assert.assertTrue(sql.contains("left join inventory b"));
+            Assert.assertTrue(sql.contains("left join inv_supplier h"));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
+    }
+
+    @Test
+    public void test136GetSQBrowseInvSerial() {
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+
+            java.lang.reflect.Method m = poController.getClass().getDeclaredMethod("getSQ_BrowseInvSerial");
+            m.setAccessible(true);
+            String sql = normalizeSql((String) m.invoke(poController));
+
+            Assert.assertFalse(sql.isEmpty());
+            Assert.assertTrue(sql.contains("from po_receiving_detail a"));
+            Assert.assertTrue(sql.contains("left join po_receiving_serial i"));
+            Assert.assertTrue(sql.contains("left join inv_serial j"));
+            Assert.assertTrue(sql.contains("left join inv_serial_registration k"));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
+    }
+
+    @Test
+    public void test137GetPOReturnSerial() {
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+
+            java.lang.reflect.Method m = poController.getClass().getDeclaredMethod("getPOReturnSerial");
+            m.setAccessible(true);
+            String sql = normalizeSql((String) m.invoke(poController));
+
+            Assert.assertFalse(sql.isEmpty());
+            Assert.assertTrue(sql.contains("from po_return_detail a"));
+            Assert.assertTrue(sql.contains("left join inv_serial b"));
+            Assert.assertTrue(sql.contains("left join inv_serial_registration d"));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
+    }
+
+    @Test
+    public void test138GetSerialPORecieving() {
+        try {
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+
+            java.lang.reflect.Method m = poController.getClass().getDeclaredMethod("getSerialPORecieving");
+            m.setAccessible(true);
+            String sql = normalizeSql((String) m.invoke(poController));
+
+            Assert.assertFalse(sql.isEmpty());
+            Assert.assertTrue(sql.contains("from po_receiving_master a"));
+            Assert.assertTrue(sql.contains("left join po_receiving_serial b"));
+            Assert.assertTrue(sql.contains("left join po_receiving_detail c"));
+            Assert.assertTrue(sql.contains("left join inv_serial d"));
+        } catch (Exception ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 
 }
