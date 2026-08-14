@@ -55,6 +55,7 @@ public class PurchaseOrderTest {
     private String psBankId = "M00120139";
     private static int pnReportSeedBase = 91000000;
     private static int pnPOQuotationSeedBase = 93000000;
+    private static int pnPOLookupSeedBase = 950;
 
     @BeforeAll
     public static void setUpClass() throws GuanzonException, SQLException, IOException {
@@ -2038,13 +2039,14 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        poController.Master().setIndustryID("09");
-        poController.Master().setCompanyID("M001");
-        poController.Master().setCategoryCode("0000007");
+        setClassConfig();
+        String supplierId = "SUP" + String.format("%09d", Math.floorMod(System.nanoTime(), 1_000_000_000L));
+        String transNo = seedPurchaseOrderForConfirmedLookup(supplierId, PurchaseOrderStatus.OPEN);
         poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
 
-        loJSON = poController.getConfirmedPurchaseOrder("M00115000863", "GCO126");
-        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        loJSON = poController.getConfirmedPurchaseOrder(supplierId, transNo.substring(transNo.length() - 6));
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(poController.getPOMasterCount() > 0);
         Assert.assertTrue(loJSON.containsKey("message"));
     }
 
@@ -2055,13 +2057,14 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        poController.Master().setIndustryID("09");
-        poController.Master().setCompanyID("M001");
-        poController.Master().setCategoryCode("0000007");
+        setClassConfig();
+        String supplierId = "SUP" + String.format("%09d", Math.floorMod(System.nanoTime(), 1_000_000_000L));
+        String transNo = seedPurchaseOrderForConfirmedLookup(supplierId, PurchaseOrderStatus.CONFIRMED);
         poController.setTransactionStatus(PurchaseOrderStatus.CONFIRMED + PurchaseOrderStatus.APPROVED);
 
-        loJSON = poController.getConfirmedPurchaseOrder("M00115000863", "GCO126");
-        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        loJSON = poController.getConfirmedPurchaseOrder(supplierId, transNo.substring(transNo.length() - 6));
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(poController.getPOMasterCount() > 0);
         Assert.assertTrue(loJSON.containsKey("message"));
     }
 
@@ -2072,13 +2075,14 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        poController.Master().setIndustryID("09");
-        poController.Master().setCompanyID("M001");
-        poController.Master().setCategoryCode("0000007");
+        setClassConfig();
+        String supplierId = "SUP" + String.format("%09d", Math.floorMod(System.nanoTime(), 1_000_000_000L));
+        String transNo = seedPurchaseOrderForConfirmedLookup(supplierId, PurchaseOrderStatus.APPROVED);
         poController.setTransactionStatus("");
 
-        loJSON = poController.getConfirmedPurchaseOrder("NO_MATCH_SUPPLIER", "NO_MATCH_REF");
-        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        loJSON = poController.getConfirmedPurchaseOrder(supplierId, transNo.substring(transNo.length() - 6));
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertTrue(poController.getPOMasterCount() > 0);
         Assert.assertTrue(loJSON.containsKey("message"));
     }
 
@@ -3247,18 +3251,24 @@ public class PurchaseOrderTest {
 
     @Test
     @Order(48)
-    public void testGetPurchaseOrderLoadsOrReturnsNoRecord() throws Exception {
+    public void testGetPurchaseOrderSingleStatusLoadsSeededRows() throws Exception {
         resetController();
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        poController.Master().setIndustryID("09");
-        poController.Master().setCompanyID("M001");
-        poController.Master().setCategoryCode("0000007");
+        setClassConfig();
+        String supplierId = "UTSUPPPO001";
+        String referTail = "Q11";
+        String branchCode = instance.getBranchCode();
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.OPEN, referTail);
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.APPROVED, referTail);
+
         poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
 
-        loJSON = poController.getPurchaseOrder("M00115000863", "GCO126", "");
-        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        loJSON = poController.getPurchaseOrder(supplierId, referTail, "IGNORED-TXN-001");
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals("Record loaded successfully.", loJSON.get("message"));
+        Assert.assertEquals(1, poController.getPOMasterCount());
     }
 
     @Test
@@ -3268,13 +3278,19 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        poController.Master().setIndustryID("09");
-        poController.Master().setCompanyID("M001");
-        poController.Master().setCategoryCode("0000007");
+        setClassConfig();
+        String supplierId = "UTSUPPPO002";
+        String referTail = "Q12";
+        String branchCode = instance.getBranchCode();
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.CONFIRMED, referTail);
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.APPROVED, referTail);
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.OPEN, referTail);
+
         poController.setTransactionStatus(PurchaseOrderStatus.CONFIRMED + PurchaseOrderStatus.APPROVED);
 
-        loJSON = poController.getPurchaseOrder("M00115000863", "GCO126", "");
-        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        loJSON = poController.getPurchaseOrder(supplierId, referTail, "IGNORED-TXN-002");
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals(2, poController.getPOMasterCount());
     }
 
     @Test
@@ -3284,13 +3300,61 @@ public class PurchaseOrderTest {
         JSONObject loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
 
-        poController.Master().setIndustryID("09");
-        poController.Master().setCompanyID("M001");
-        poController.Master().setCategoryCode("0000007");
+        setClassConfig();
+        String supplierId = "UTSUPPPO003";
+        String referTail = "Q13";
+        String branchCode = instance.getBranchCode();
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.OPEN, referTail);
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.CONFIRMED, referTail);
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.APPROVED, referTail);
+
         poController.setTransactionStatus("");
 
-        loJSON = poController.getPurchaseOrder("NO_MATCH_SUPPLIER", "NO_MATCH_REF", "");
-        Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
+        loJSON = poController.getPurchaseOrder(supplierId, referTail, "IGNORED-TXN-003");
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals(3, poController.getPOMasterCount());
+    }
+
+    @Test
+    @Order(248)
+    public void testGetPurchaseOrderIgnoresTransactionNoParameter() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        String supplierId = "UTSUPPPO004";
+        String referTail = "Q14";
+        String branchCode = instance.getBranchCode();
+        seedPurchaseOrderForLookup(branchCode, supplierId, PurchaseOrderStatus.OPEN, referTail);
+
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        JSONObject first = poController.getPurchaseOrder(supplierId, referTail, "TXN-ONE");
+        int firstCount = poController.getPOMasterCount();
+
+        JSONObject second = poController.getPurchaseOrder(supplierId, referTail, "TXN-TWO");
+        int secondCount = poController.getPOMasterCount();
+
+        Assert.assertEquals("success", first.get("result"));
+        Assert.assertEquals("success", second.get("result"));
+        Assert.assertEquals(firstCount, secondCount);
+    }
+
+    @Test
+    @Order(249)
+    public void testGetPurchaseOrderNoMatchStillReturnsSuccess() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        setClassConfig();
+        poController.setTransactionStatus(PurchaseOrderStatus.OPEN);
+
+        loJSON = poController.getPurchaseOrder("NO_MATCH_SUPPLIER_UT", "NO_MATCH_REF_UT", "IGNORED-TXN-004");
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals("Record loaded successfully.", loJSON.get("message"));
+        Assert.assertEquals(0, poController.getPOMasterCount());
     }
 
     @Test
@@ -4031,6 +4095,68 @@ public class PurchaseOrderTest {
         return null;
     }
 
+    private static String seedPurchaseOrderForConfirmedLookup(String supplierId, String tranStatus) throws SQLException {
+        int seed;
+        synchronized (PurchaseOrderTest.class) {
+            seed = pnPOLookupSeedBase++;
+        }
+
+        String transNo = "GCO" + String.format("%09d", seed);
+        String branchCode = instance.getBranchCode();
+        if (branchCode == null || branchCode.isEmpty()) {
+            branchCode = "GK01";
+        }
+
+        String masterSql = "INSERT INTO po_master ("
+                + "sTransNox, sBranchCd, sIndstCdx, sCategrCd, dTransact, sCompnyID, sSupplier, sReferNox, nDiscount, nAddDiscx, nTranTotl, nAmtPaidx, nDPRatexx, nAdvAmtxx, nNetTotal, nEntryNox, cProcessd, cTranStat, sModified, dModified"
+                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String detailSql = "INSERT INTO po_detail ("
+                + "sTransNox, nEntryNox, sStockIDx, sDescript, nOldPrice, nUnitPrce, nQtyOnHnd, nRecOrder, nQuantity, nReceived, nCancelld, sSourceCd, sSourceNo, dModified"
+                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement masterStmt = conn.prepareStatement(masterSql); PreparedStatement detailStmt = conn.prepareStatement(detailSql)) {
+            masterStmt.setString(1, transNo);
+            masterStmt.setString(2, branchCode);
+            masterStmt.setString(3, psIndustryId);
+            masterStmt.setString(4, psCategorCd);
+            masterStmt.setDate(5, java.sql.Date.valueOf("2026-08-14"));
+            masterStmt.setString(6, psCompanyId);
+            masterStmt.setString(7, supplierId);
+            masterStmt.setString(8, "SR" + seed);
+            masterStmt.setDouble(9, 0.0);
+            masterStmt.setDouble(10, 0.0);
+            masterStmt.setDouble(11, 100.0);
+            masterStmt.setDouble(12, 0.0);
+            masterStmt.setDouble(13, 0.0);
+            masterStmt.setDouble(14, 0.0);
+            masterStmt.setDouble(15, 100.0);
+            masterStmt.setInt(16, 1);
+            masterStmt.setString(17, "0");
+            masterStmt.setString(18, tranStatus);
+            masterStmt.setString(19, "M001250015");
+            masterStmt.setTimestamp(20, Timestamp.valueOf(java.time.LocalDateTime.now()));
+            masterStmt.executeUpdate();
+
+            detailStmt.setString(1, transNo);
+            detailStmt.setInt(2, 1);
+            detailStmt.setString(3, "GK0123000010");
+            detailStmt.setString(4, "seeded item for confirmed lookup");
+            detailStmt.setDouble(5, 100.0);
+            detailStmt.setDouble(6, 100.0);
+            detailStmt.setDouble(7, 0.0);
+            detailStmt.setDouble(8, 0.0);
+            detailStmt.setDouble(9, 1.0);
+            detailStmt.setDouble(10, 0.0);
+            detailStmt.setDouble(11, 0.0);
+            detailStmt.setString(12, "SRqM");
+            detailStmt.setString(13, "REF" + seed);
+            detailStmt.setTimestamp(14, Timestamp.valueOf(java.time.LocalDateTime.now()));
+            detailStmt.executeUpdate();
+        }
+
+        return transNo;
+    }
+
     private static void setPrivateField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
@@ -4380,6 +4506,90 @@ public class PurchaseOrderTest {
                 detailStmt.executeUpdate();
             }
         }
+    }
+
+    private static String seedPurchaseOrderForLookup(String branchCode, String supplierId, String status, String referTail) throws SQLException {
+        String normalizedBranch = normalizeBranchPrefix(branchCode);
+        String normalizedTail = normalizeLookupTail(referTail);
+        int seed;
+        synchronized (PurchaseOrderTest.class) {
+            seed = pnPOLookupSeedBase++;
+        }
+
+        String transNo = normalizedBranch + String.format("%05d", seed % 100000) + normalizedTail;
+
+        String masterSql = "INSERT INTO po_master ("
+                + "sTransNox, sBranchCd, sIndstCdx, sCategrCd, dTransact, sCompnyID, sDestinat, sSupplier, sTermCode, nDiscount, nAddDiscx, nTranTotl, nAmtPaidx, cWithAddx, nDPRatexx, nAdvAmtxx, nNetTotal, cTranStat"
+                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String detailSql = "INSERT INTO po_detail ("
+                + "sTransNox, nEntryNox, sStockIDx, nUnitPrce, nQuantity, nReceived, nCancelld, sSourceCd, sSourceNo, dModified"
+                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement masterStmt = conn.prepareStatement(masterSql); PreparedStatement detailStmt = conn.prepareStatement(detailSql)) {
+            masterStmt.setString(1, transNo);
+            masterStmt.setString(2, normalizedBranch);
+            masterStmt.setString(3, psIndustryId);
+            masterStmt.setString(4, psCategorCd);
+            masterStmt.setDate(5, java.sql.Date.valueOf("2026-08-12"));
+            masterStmt.setString(6, psCompanyId);
+            masterStmt.setString(7, normalizedBranch);
+            masterStmt.setString(8, supplierId);
+            masterStmt.setString(9, "M001001");
+            masterStmt.setDouble(10, 0.0);
+            masterStmt.setDouble(11, 0.0);
+            masterStmt.setDouble(12, 1200.0);
+            masterStmt.setDouble(13, 0.0);
+            masterStmt.setString(14, "0");
+            masterStmt.setDouble(15, 0.0);
+            masterStmt.setDouble(16, 0.0);
+            masterStmt.setDouble(17, 1200.0);
+            masterStmt.setString(18, status);
+            masterStmt.executeUpdate();
+
+            detailStmt.setString(1, transNo);
+            detailStmt.setInt(2, 1);
+            detailStmt.setString(3, "GK0123000010");
+            detailStmt.setDouble(4, 1200.0);
+            detailStmt.setDouble(5, 1.0);
+            detailStmt.setDouble(6, 0.0);
+            detailStmt.setDouble(7, 0.0);
+            detailStmt.setString(8, "SReq");
+            detailStmt.setString(9, transNo);
+            detailStmt.setTimestamp(10, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+            detailStmt.executeUpdate();
+        }
+
+        return transNo;
+    }
+
+    private static String normalizeBranchPrefix(String branchCode) {
+        String value = branchCode == null ? "GK01" : branchCode;
+        value = value.replaceAll("[^A-Za-z0-9]", "");
+        if (value.isEmpty()) {
+            value = "GK01";
+        }
+        if (value.length() > 4) {
+            value = value.substring(0, 4);
+        }
+        while (value.length() < 4) {
+            value = value + "0";
+        }
+        return value;
+    }
+
+    private static String normalizeLookupTail(String tail) {
+        String value = tail == null ? "000" : tail;
+        value = value.replaceAll("[^A-Za-z0-9]", "");
+        if (value.isEmpty()) {
+            value = "000";
+        }
+        if (value.length() > 3) {
+            value = value.substring(value.length() - 3);
+        }
+        while (value.length() < 3) {
+            value = "0" + value;
+        }
+        return value;
     }
 
     private static String nextPOQuotationTransNo() {
