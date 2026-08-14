@@ -2026,18 +2026,45 @@ public class PurchaseOrderTest {
         Assert.assertTrue(loJSON.containsKey("count"));
     }
 
-//    @Test
-//    @Order(101)
-//    public void testPOCancelTransactionReturnsStructuredResult() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//        loJSON = poController.OpenTransaction("GK0126000117");
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.POCancelTransaction();
-//        Assert.assertTrue(loJSON.containsKey("result"));
-//    }
+    @Test
+    @Order(901)
+    public void testPOCancelTransactionSuccessPathReturnsSuccess() throws Exception {
+        JSONObject statusChangeResult = new JSONObject();
+        statusChangeResult.put("result", "success");
+
+        PurchaseOrder cancelHarness = buildCancelTransactionHarness(statusChangeResult, null);
+        JSONObject loJSON = cancelHarness.POCancelTransaction();
+
+        Assert.assertEquals("success", loJSON.get("result"));
+        Assert.assertEquals("Transaction cancelled successfully.", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(902)
+    public void testPOCancelTransactionReturnsErrorWhenStatusChangeFails() throws Exception {
+        JSONObject statusChangeResult = new JSONObject();
+        statusChangeResult.put("result", "error");
+        statusChangeResult.put("message", "forced statusChange error");
+
+        PurchaseOrder cancelHarness = buildCancelTransactionHarness(statusChangeResult, null);
+        JSONObject loJSON = cancelHarness.POCancelTransaction();
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals("forced statusChange error", loJSON.get("message"));
+    }
+
+    @Test
+    @Order(903)
+    public void testPOCancelTransactionCatchReturnsErrorWhenStatusChangeThrowsSQLException() throws Exception {
+        PurchaseOrder cancelHarness = buildCancelTransactionHarness(null,
+                new SQLException("forced sql exception for POCancelTransaction"));
+
+        JSONObject loJSON = cancelHarness.POCancelTransaction();
+
+        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertTrue(String.valueOf(loJSON.get("message"))
+                .contains("forced sql exception for POCancelTransaction"));
+    }
     @Test
     @Order(102)
     public void testGetConfirmedPurchaseOrderReturnsStructuredResult() throws Exception {
@@ -4043,6 +4070,26 @@ public class PurchaseOrderTest {
         return method.invoke(target, args);
     }
 
+    private static final class StubbedStatusChangePurchaseOrder extends PurchaseOrder {
+        private final JSONObject forcedResult;
+        private final SQLException forcedSqlException;
+
+        private StubbedStatusChangePurchaseOrder(JSONObject forcedResult, SQLException forcedSqlException) {
+            this.forcedResult = forcedResult;
+            this.forcedSqlException = forcedSqlException;
+        }
+
+        @Override
+        public JSONObject statusChange(String tableName, String transNo, String remarks,
+                String newStatus, boolean withUndo, boolean addStatusHistory)
+                throws SQLException, GuanzonException, CloneNotSupportedException {
+            if (forcedSqlException != null) {
+                throw forcedSqlException;
+            }
+            return forcedResult;
+        }
+    }
+
     private static final class StubCashflowControllers extends CashflowControllers {
         private final PaymentRequest paymentRequest;
 
@@ -4502,6 +4549,20 @@ public class PurchaseOrderTest {
         Field field = getFieldFromHierarchy(target.getClass(), fieldName);
         field.setAccessible(true);
         return field.get(target);
+    }
+
+    private static PurchaseOrder buildCancelTransactionHarness(JSONObject forcedStatusChangeResult,
+            SQLException forcedStatusChangeException) throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        PurchaseOrder harness = new StubbedStatusChangePurchaseOrder(forcedStatusChangeResult, forcedStatusChangeException);
+
+        // Reuse initialized internals so the method can read table and transaction fields safely.
+        setPrivateFieldInHierarchy(harness, "poMaster", getPrivateFieldInHierarchy(poController, "poMaster"));
+        setPrivateFieldInHierarchy(harness, "poGRider", getPrivateFieldInHierarchy(poController, "poGRider"));
+        return harness;
     }
 
     private static Field getFieldFromHierarchy(Class<?> type, String fieldName) throws NoSuchFieldException {
