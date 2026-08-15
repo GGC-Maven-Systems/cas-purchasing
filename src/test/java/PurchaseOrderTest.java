@@ -61,9 +61,7 @@ public class PurchaseOrderTest {
     private static String psCompanyId = "M001";
     private static String psCategorCd = "0000005";
     private String psSalesCommitmentNo = "GCO126000002";
-    private String psTransNo = "GK0126000001";
     private String psStockId = "GK0123000010";
-    private String psBankId = "M00120139";
     private static int pnReportSeedBase = 91000000;
     private static int pnPOQuotationSeedBase = 93000000;
     private static int pnPOLookupSeedBase = 950;
@@ -651,24 +649,6 @@ public class PurchaseOrderTest {
         }
     }
 
-//    @Test
-//    @Order(17)
-//    public void testPostTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
-//        JSONObject loJSON;
-//
-//        resetController();
-//        loJSON = poController.InitTransaction();
-//        loJSON = poController.OpenTransaction("GK0126000116");
-//        if (!"success".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//        loJSON = poController.PostTransaction("");
-//        if ("error".equals((String) loJSON.get("result"))) {
-//            System.err.println((String) loJSON.get("message"));
-//            Assert.fail();
-//        }
-//    }
     @Test
     @Order(18)
     public void testCancelTransactionRequiresReadyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException, ParseException {
@@ -1937,32 +1917,6 @@ public class PurchaseOrderTest {
         Assert.assertTrue("success".equals(loJSON.get("result")) || "error".equals(loJSON.get("result")));
     }
 
-//    @Test
-//    @Order(98)
-//    public void testSaveOthersSkipsProjectSaveWhenDepartmentDoesNotMatch() throws Exception {
-//        startNewTransaction();
-//        setPrivateField(poController, "allowedDepartment", "DEPT-NOT-MATCHED-FOR-COVERAGE");
-//        poController.Master().setTransactionStatus(PurchaseOrderStatus.OPEN);
-//        poController.Master().setReference("PROJECT-SHOULD-BE-SKIPPED-" + System.nanoTime());
-//        poController.resetattachment();
-//
-//        Model_Project failingProject = new Model_Project() {
-//            @Override
-//            public JSONObject saveRecord() {
-//                JSONObject failed = new JSONObject();
-//                failed.put("result", "error");
-//                failed.put("message", "project save should be skipped (department mismatch)");
-//                return failed;
-//            }
-//        };
-//
-//        setPrivateField(poController, "poProject", failingProject);
-//
-//        JSONObject loJSON = poController.saveOthers();
-//        Assert.assertTrue(loJSON.containsKey("result"));
-//        Assert.assertFalse(String.valueOf(loJSON.getOrDefault("message", ""))
-//                .contains("department mismatch"));
-//    }
     @Test
     @Order(98)
     public void testSaveOthersSkipsProjectSaveWhenStatusIsNotOpenCancelledOrVoid() throws Exception {
@@ -3632,21 +3586,6 @@ public class PurchaseOrderTest {
         Assert.assertEquals("forced-save-project-error", result.get("message"));
     }
 
-//    @Test
-//    @Order(151)
-//    public void testGetSysUserReturnsSeededCompanyName() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-////        ensureAuditAndSysUserTables();
-////        seedClientMaster("M001250015", "Coverage User Company");
-////        seedSysUser("UTUSER01", "M001250015");
-//
-//        String name = poController.getSysUser("UTUSER01");
-//        Assert.assertNotNull(name);
-//        Assert.assertFalse(name.trim().isEmpty());
-//    }
     @Test
     @Order(152)
     public void testGetSysUserHandlesSQLExceptionInsideMethod() throws Exception {
@@ -4349,80 +4288,6 @@ public class PurchaseOrderTest {
         Assert.assertTrue(((org.json.simple.JSONArray) loJSON.get("data")).size() > 0);
     }
 
-//    @Test
-//    @Order(54)
-//    public void testPostTransactionWithoutLoadedTransactionReturnsError() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.PostTransaction("");
-//        Assert.assertEquals("error", loJSON.get("result"));
-//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
-//    }
-//
-//    @Test
-//    @Order(55)
-//    public void testCancelTransactionWithoutLoadedTransactionReturnsError() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.CancelTransaction("");
-//        Assert.assertEquals("error", loJSON.get("result"));
-//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
-//    }
-//
-//    @Test
-//    @Order(56)
-//    public void testVoidTransactionWithoutLoadedTransactionReturnsError() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.VoidTransaction("");
-//        Assert.assertEquals("error", loJSON.get("result"));
-//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
-//    }
-//
-//    @Test
-//    @Order(57)
-//    public void testReturnTransactionWithoutLoadedTransactionReturnsError() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.ReturnTransaction("");
-//        Assert.assertEquals("error", loJSON.get("result"));
-//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
-//    }
-//
-//    @Test
-//    @Order(58)
-//    public void testApproveTransactionWithoutLoadedTransactionReturnsError() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.ApproveTransaction("");
-//        Assert.assertEquals("error", loJSON.get("result"));
-//        Assert.assertEquals("No transacton was loaded.", loJSON.get("message"));
-//    }
-//
-//    @Test
-//    @Order(59)
-//    public void testReturnTransactionWhenAlreadyReturnedReturnsError() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.OpenTransaction("GCO126000034");
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        loJSON = poController.ReturnTransaction("");
-//        Assert.assertEquals("error", loJSON.get("result"));
-//        Assert.assertEquals("Transaction was already returned.", loJSON.get("message"));
-//    }
     private static Object invokePrivateMethod(Object target, String methodName, Class<?>[] parameterTypes, Object[] args) throws Exception {
         Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
