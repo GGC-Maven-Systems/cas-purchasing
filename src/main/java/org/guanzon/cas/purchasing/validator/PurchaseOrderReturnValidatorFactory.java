@@ -6,6 +6,7 @@
 package org.guanzon.cas.purchasing.validator;
 
 import org.guanzon.appdriver.iface.GValidator;
+import org.guanzon.cas.purchasing.status.PurchaseOrderReturnStatus;
 
 /**
  *
@@ -14,17 +15,19 @@ import org.guanzon.appdriver.iface.GValidator;
 public class PurchaseOrderReturnValidatorFactory {
     public static GValidator make(String industryId){
         switch (industryId) {
-            case "01": //Mobile Phone
+            case PurchaseOrderReturnStatus.Industry.MOBILEPHONE: //Mobile Phone
                 return new PurchaseOrderReturn_MP();
-            case "02": //Motorcycle
+            case PurchaseOrderReturnStatus.Industry.MOTORCYCLE: //Motorcycle
                 return new PurchaseOrderReturn_MC();
-            case "03": //Vehicle
+            case PurchaseOrderReturnStatus.Industry.CAR: //Vehicle
+            case PurchaseOrderReturnStatus.Industry.CAR_Nissan: //Vehicle
+            case PurchaseOrderReturnStatus.Industry.CAR_Any: //Vehicle
                 return new PurchaseOrderReturn_Vehicle();
-            case "04": //Hospitality
+            case PurchaseOrderReturnStatus.Industry.HOSPITALITY: //Hospitality
                 return new PurchaseOrderReturn_Hospitality();
-            case "05": //Los Pedritos
+            case PurchaseOrderReturnStatus.Industry.LPFOOD: //Los Pedritos
                 return new PurchaseOrderReturn_LP();
-            case "07": //Appliances
+            case PurchaseOrderReturnStatus.Industry.APPLIANCES: //Appliances
                 return new PurchaseOrderReturn_Appliances();
             default:
                 return new PurchaseOrderReturn_General();
