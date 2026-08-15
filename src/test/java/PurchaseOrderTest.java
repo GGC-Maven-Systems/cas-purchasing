@@ -1180,40 +1180,34 @@ public class PurchaseOrderTest {
         Assert.assertEquals(0, poController.getTransactionAttachmentCount());
     }
 
-//    @Test
-//    @Order(74)
-//    public void testCopyFileWithMissingSourceDoesNotCreateTarget() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        String fileName = "copy-missing-" + System.nanoTime() + ".tmp";
-//        Path target = Paths.get(System.getProperty("sys.default.path.temp.attachments"), fileName);
-//        Files.deleteIfExists(target);
-//
-//        poController.copyFile(Paths.get(System.getProperty("sys.default.path.temp.attachments"), fileName).toString());
-//        Assert.assertFalse(Files.exists(target));
-//    }
-//
-//    @Test
-//    @Order(75)
-//    public void testCopyFileCopiesToAttachmentTempPath() throws Exception {
-//        resetController();
-//        JSONObject loJSON = poController.InitTransaction();
-//        Assert.assertEquals("success", loJSON.get("result"));
-//
-//        String fileName = "copy-success-" + System.nanoTime() + ".tmp";
-//        Path sourceDir = Paths.get(System.getProperty("sys.default.path.temp"));
-//        Files.createDirectories(sourceDir);
-//        Path source = sourceDir.resolve(fileName);
-//        Files.write(source, "copy-file-content".getBytes(StandardCharsets.UTF_8));
-//
-//        Path target = Paths.get(System.getProperty("sys.default.path.temp.attachments"), fileName);
-//        Files.deleteIfExists(target);
-//
-//        poController.copyFile(source.toString());
-//        Assert.assertTrue(Files.exists(target));
-//    }
+    @Test
+    @Order(74)
+    public void testCopyFileWithMissingSourceDoesNotCreateTarget() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String fileName = "copy-missing-" + System.nanoTime() + ".tmp";
+        Path target = Paths.get(System.getProperty("sys.default.path.temp.attachments"), fileName);
+        Files.deleteIfExists(target);
+
+        poController.copyFile(Paths.get(System.getProperty("sys.default.path.temp.attachments"), fileName).toString());
+        Assert.assertFalse(Files.exists(target));
+    }
+
+    @Test
+    @Order(75)
+    public void testCopyFileCopiesToAttachmentTempPath() throws Exception {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        String fileName = "D:\\GGC_Maven_Systems\\images\\Assets\\Picture15.png";
+        Path target = Paths.get(fileName);
+        poController.copyFile(fileName);
+        Assert.assertTrue(Files.exists(target));
+    }
+
     @Test
     @Order(76)
     public void testUploadCASAttachmentsReturnsErrorWhenNewAndOriginalFilesMissing() throws Exception {
