@@ -3357,6 +3357,15 @@ public class PurchaseOrderReceivingTest {
         Assert.assertNotNull(loJSON);
         System.out.println("MESSAGE : " + String.valueOf(loJSON.get("message")));
         Assert.assertEquals("success", String.valueOf(loJSON.get("result")));
+        
+        resetController();
+        loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GK0126000080");
+        Assume.assumeTrue("Fixture transaction not available: " + "GK0126000080",
+                "success".equals(loJSON.get("result")));
+        loJSON = poController.ConfirmTransaction("test");
+        Assert.assertEquals("success", loJSON.get("result"));
     
         } catch (Exception ex) {
             Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
@@ -3450,4 +3459,12 @@ public class PurchaseOrderReceivingTest {
         }
     }
 
+    @Test
+    public void test139CompanyId() {
+        resetController();
+        JSONObject loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+
+        System.out.println("Company : " + poController.getCompanyId() );
+    }
 }
