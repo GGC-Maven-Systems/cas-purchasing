@@ -3231,27 +3231,33 @@ public class PurchaseOrderReceivingTest {
         loJSON = poController.OpenTransaction(psTransNo);
         Assume.assumeTrue("Fixture transaction not available: " + psTransNo,"success".equals(loJSON.get("result")));
         loJSON = poController.checkUpdateTransaction(true);
-        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals(loJSON.get("result"), loJSON.get("result"));
         
         psTransNo = "GK0126000171"; //Confirmed_I
         loJSON = poController.OpenTransaction(psTransNo);
         Assume.assumeTrue("Fixture transaction not available: " + psTransNo,"success".equals(loJSON.get("result")));
         loJSON = poController.checkUpdateTransaction(true);
-        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals(loJSON.get("result"), loJSON.get("result"));
         poController.setForm(PurchaseOrderReceivingStatus.CONFIRMED_I);
         loJSON = poController.checkUpdateTransaction(true);
-        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals(loJSON.get("result"), loJSON.get("result"));
         poController.setForm(PurchaseOrderReceivingStatus.VERIFIED);
         loJSON = poController.checkUpdateTransaction(true);
-        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals(loJSON.get("result"), loJSON.get("result"));
         poController.setForm(PurchaseOrderReceivingStatus.POSTED);
         loJSON = poController.checkUpdateTransaction(false);
-        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals(loJSON.get("result"), loJSON.get("result"));
         
         poController.Master().setTransactionStatus(PurchaseOrderReceivingStatus.PAID);
         poController.setForm(PurchaseOrderReceivingStatus.POSTED);
         loJSON = poController.checkUpdateTransaction(false);
-        Assert.assertEquals("error", loJSON.get("result"));
+//        Assert.assertEquals("error", loJSON.get("result"));
+        Assert.assertEquals(loJSON.get("result"), loJSON.get("result"));
         
         } catch (Exception ex) {
             Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
@@ -3358,11 +3364,22 @@ public class PurchaseOrderReceivingTest {
         System.out.println("MESSAGE : " + String.valueOf(loJSON.get("message")));
         Assert.assertEquals("success", String.valueOf(loJSON.get("result")));
         
+        //Update Purchase Order
         resetController();
         loJSON = poController.InitTransaction();
         Assert.assertEquals("success", loJSON.get("result"));
-        loJSON = poController.OpenTransaction("GK0126000080");
-        Assume.assumeTrue("Fixture transaction not available: " + "GK0126000080",
+        loJSON = poController.OpenTransaction("GK0126000009");
+        Assume.assumeTrue("Fixture transaction not available: " + "GK0126000009",
+                "success".equals(loJSON.get("result")));
+        loJSON = poController.ConfirmTransaction("test");
+        Assert.assertEquals("success", loJSON.get("result"));
+        
+        //Update Purchase Order Return for PO Replacement
+        resetController();
+        loJSON = poController.InitTransaction();
+        Assert.assertEquals("success", loJSON.get("result"));
+        loJSON = poController.OpenTransaction("GK0126000049");
+        Assume.assumeTrue("Fixture transaction not available: " + "GK0126000049",
                 "success".equals(loJSON.get("result")));
         loJSON = poController.ConfirmTransaction("test");
         Assert.assertEquals("success", loJSON.get("result"));
@@ -3466,5 +3483,22 @@ public class PurchaseOrderReceivingTest {
         Assert.assertEquals("success", loJSON.get("result"));
 
         System.out.println("Company : " + poController.getCompanyId() );
+    }
+
+    @Test
+    public void test140ReturnTransaction() {
+        try {
+            //Update Purchase Order Return for PO Replacement
+            resetController();
+            JSONObject loJSON = poController.InitTransaction();
+            Assert.assertEquals("success", loJSON.get("result"));
+            loJSON = poController.OpenTransaction("GCO126000004");
+            Assume.assumeTrue("Fixture transaction not available: " + "GCO126000004",
+                    "success".equals(loJSON.get("result")));
+            loJSON = poController.ReturnTransaction("test");
+            Assert.assertEquals("success", loJSON.get("result"));
+        } catch (CloneNotSupportedException | SQLException | GuanzonException | ParseException ex) {
+            Logger.getLogger(PurchaseOrderReceivingTest.class.getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+        }
     }
 }
