@@ -132,6 +132,7 @@ public class PurchaseOrderReceiving extends Transaction {
     private boolean pbApproval = false;
     private boolean pbIsPrint = false;
     private boolean pbIsFinance = false;
+    private boolean pbUnitTest = false;
     private String psPurpose = PurchaseOrderReceivingStatus.Purpose.REGULAR;
     private String psIndustryId = "";
     private String psCompanyId = "";
@@ -213,6 +214,10 @@ public class PurchaseOrderReceiving extends Transaction {
     * @throws GuanzonException if query execution fails
     */
     public String checkPosition(String fsStatus, String fsUserId) throws SQLException, GuanzonException{
+        if(pbUnitTest){
+            return "unittest";
+        }
+        
         String lsSQL = " SELECT   " +
                     "  a.sUserIDxx, " +
                     "  d.sCompnyNm, " +
@@ -324,13 +329,13 @@ public class PurchaseOrderReceiving extends Transaction {
                     return poJSON;
                 }
                 break;
-            case PurchaseOrderReceivingStatus.RETURNED:
-                if(!PurchaseOrderReceivingStatus.CONFIRMED.equals(psForm)){
-                    poJSON.put("message", "Transaction status was already "+getStatus(loObject.getTransactionStatus())+"!\nCheck transaction history.");
-                    poJSON.put("result", "error");
-                    return poJSON;
-                }
-                break;
+//            case PurchaseOrderReceivingStatus.RETURNED:
+//                if(!PurchaseOrderReceivingStatus.CONFIRMED.equals(psForm)){
+//                    poJSON.put("message", "Transaction status was already "+getStatus(loObject.getTransactionStatus())+"!\nCheck transaction history.");
+//                    poJSON.put("result", "error");
+//                    return poJSON;
+//                }
+//                break;
             case PurchaseOrderReceivingStatus.CONFIRMED_I:
             case PurchaseOrderReceivingStatus.VERIFIED:
             case PurchaseOrderReceivingStatus.POSTED:
@@ -734,87 +739,87 @@ public class PurchaseOrderReceiving extends Transaction {
      * @throws GuanzonException
      * @throws CloneNotSupportedException 
      */
-    public JSONObject ReturnTransaction(String remarks)
-            throws ParseException,
-            SQLException,
-            GuanzonException,
-            CloneNotSupportedException {
-        poJSON = new JSONObject();
-
-        String lsStatus = PurchaseOrderReceivingStatus.RETURNED;
-        boolean lbReturn = true;
-
-        if (getEditMode() != EditMode.READY) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "No transacton was loaded.");
-            return poJSON;
-        }
-
-        if (lsStatus.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already returned.");
-            return poJSON;
-        }
-
-        //validator
-        poJSON = isEntryOkay(PurchaseOrderReceivingStatus.RETURNED);
-        if (!"success".equals((String) poJSON.get("result"))) {
-            return poJSON;
-        }
-
-        if (PurchaseOrderReceivingStatus.CONFIRMED.equals(Master().getTransactionStatus())) {
-            if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-                poJSON = ShowDialogFX.getUserApproval(poGRider);
-                if (!"success".equals((String) poJSON.get("result"))) {
-                    return poJSON;
-                } else {
-                    if(Integer.parseInt(poJSON.get("nUserLevl").toString())<= UserRight.ENCODER){
-                        poJSON.put("result", "error");
-                        poJSON.put("message", "User is not an authorized approving officer.");
-                        return poJSON;
-                    }
-                }
-                
-                setApproving((String) poJSON.get("sUserIDxx"));
-            }
-            
-            //Set receive qty to Purchase Order
-            poJSON = setValueToOthers(lsStatus);
-            if (!"success".equals((String) poJSON.get("result"))) {
-                return poJSON;
-            }
-        }
-
-        poGRider.beginTrans("UPDATE STATUS", "ReturnTransaction", SOURCE_CODE, Master().getTransactionNo());
-        
-        if (PurchaseOrderReceivingStatus.CONFIRMED.equals(Master().getTransactionStatus())) {
-            //Update Purchase Order, PO Return
-            poJSON = saveUpdateOthers(PurchaseOrderReceivingStatus.CONFIRMED);
-            if (!"success".equals((String) poJSON.get("result"))) {
-                poGRider.rollbackTrans();
-                return poJSON;
-            }
-        }
-        
-        //change status
-        poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), remarks, lsStatus, !lbReturn, true);
-        if (!"success".equals((String) poJSON.get("result"))) {
-            poGRider.rollbackTrans();
-            return poJSON;
-        }
-
-        poGRider.commitTrans();
-
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        if (lbReturn) {
-            poJSON.put("message", "Transaction returned successfully.");
-        } else {
-            poJSON.put("message", "Transaction return request submitted successfully.");
-        }
-
-        return poJSON;
-    }
+//    public JSONObject ReturnTransaction(String remarks)
+//            throws ParseException,
+//            SQLException,
+//            GuanzonException,
+//            CloneNotSupportedException {
+//        poJSON = new JSONObject();
+//
+//        String lsStatus = PurchaseOrderReceivingStatus.RETURNED;
+//        boolean lbReturn = true;
+//
+//        if (getEditMode() != EditMode.READY) {
+//            poJSON.put("result", "error");
+//            poJSON.put("message", "No transacton was loaded.");
+//            return poJSON;
+//        }
+//
+//        if (lsStatus.equals((String) poMaster.getValue("cTranStat"))) {
+//            poJSON.put("result", "error");
+//            poJSON.put("message", "Transaction was already returned.");
+//            return poJSON;
+//        }
+//
+//        //validator
+//        poJSON = isEntryOkay(PurchaseOrderReceivingStatus.RETURNED);
+//        if (!"success".equals((String) poJSON.get("result"))) {
+//            return poJSON;
+//        }
+//
+//        if (PurchaseOrderReceivingStatus.CONFIRMED.equals(Master().getTransactionStatus())) {
+//            if (poGRider.getUserLevel() <= UserRight.ENCODER) {
+//                poJSON = ShowDialogFX.getUserApproval(poGRider);
+//                if (!"success".equals((String) poJSON.get("result"))) {
+//                    return poJSON;
+//                } else {
+//                    if(Integer.parseInt(poJSON.get("nUserLevl").toString())<= UserRight.ENCODER){
+//                        poJSON.put("result", "error");
+//                        poJSON.put("message", "User is not an authorized approving officer.");
+//                        return poJSON;
+//                    }
+//                }
+//                
+//                setApproving((String) poJSON.get("sUserIDxx"));
+//            }
+//            
+//            //Set receive qty to Purchase Order
+//            poJSON = setValueToOthers(lsStatus);
+//            if (!"success".equals((String) poJSON.get("result"))) {
+//                return poJSON;
+//            }
+//        }
+//
+//        poGRider.beginTrans("UPDATE STATUS", "ReturnTransaction", SOURCE_CODE, Master().getTransactionNo());
+//        
+//        if (PurchaseOrderReceivingStatus.CONFIRMED.equals(Master().getTransactionStatus())) {
+//            //Update Purchase Order, PO Return
+//            poJSON = saveUpdateOthers(PurchaseOrderReceivingStatus.CONFIRMED);
+//            if (!"success".equals((String) poJSON.get("result"))) {
+//                poGRider.rollbackTrans();
+//                return poJSON;
+//            }
+//        }
+//        
+//        //change status
+//        poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), remarks, lsStatus, !lbReturn, true);
+//        if (!"success".equals((String) poJSON.get("result"))) {
+//            poGRider.rollbackTrans();
+//            return poJSON;
+//        }
+//
+//        poGRider.commitTrans();
+//
+//        poJSON = new JSONObject();
+//        poJSON.put("result", "success");
+//        if (lbReturn) {
+//            poJSON.put("message", "Transaction returned successfully.");
+//        } else {
+//            poJSON.put("message", "Transaction return request submitted successfully.");
+//        }
+//
+//        return poJSON;
+//    }
     
     //SI Posting Confirmation- Arsiela 06-22-2026
     /**
@@ -852,7 +857,7 @@ public class PurchaseOrderReceiving extends Transaction {
             poJSON.put("message", "User is not an authorized officer." );
             return poJSON;
         }
-        
+
         String lsUserId = poGRider.getUserID();
         poJSON = seekApproval();
         if("error".equalsIgnoreCase((String)poJSON.get("result"))){
@@ -997,7 +1002,7 @@ public class PurchaseOrderReceiving extends Transaction {
             poJSON.put("message", "User is not an authorized officer." );
             return poJSON;
         }
-        
+
         String lsUserId = poGRider.getUserID();
         poJSON = seekApproval();
         if("error".equalsIgnoreCase((String)poJSON.get("result"))){
@@ -2946,72 +2951,72 @@ public class PurchaseOrderReceiving extends Transaction {
     }
 
     //TODO
-    private JSONObject CheckSerial(String value, int row){
-        poJSON = new JSONObject();
-        if(value == null || "".equals(value)){
-            poJSON.put("continue", true);
-            return poJSON;
-        }
-        try {
-            String lsSQL = "";
-            if(Master().getPurpose().equals(PurchaseOrderReceivingStatus.Purpose.REPLACEMENT)){
-                lsSQL = MiscUtil.addCondition( getPOReturnSerial(),
-                        " ( b.sSerial01 = " + SQLUtil.toSQL(value)
-                                + " OR b.sSerial02 = " + SQLUtil.toSQL(value)
-                                + " ) "
-                                + " AND a.sTransNox = " + SQLUtil.toSQL(Detail(PurchaseOrderReceivingSerialList(row).getEntryNo()-1).getOrderNo()) );
-            } else {
-                Model_Inv_Serial object = new InvModels(poGRider).InventorySerial();
-                lsSQL = MiscUtil.addCondition( MiscUtil.makeSelect(object),
-                        " ( sSerial01 = " + SQLUtil.toSQL(value)
-                                + " OR sSerial02 = " + SQLUtil.toSQL(value)
-                                + " ) ");
-            }
-            
-            System.out.println("Executing SQL: " + lsSQL);
-            ResultSet loRS = poGRider.executeQuery(lsSQL);
-            if (MiscUtil.RecordCount(loRS) >= 0) {
-                if (loRS.next()) {
-                    // Print the result set
-                    System.out.println("sSerialID: " + loRS.getString("sSerialID"));
-                    System.out.println("sSerial01: " + loRS.getString("sSerial01"));
-                    System.out.println("sSerial02: " + loRS.getString("sSerial02"));
-                    System.out.println("------------------------------------------------------------------------------");
-                    
-                    //Check Exisiting Receiving
-                    poJSON = checkExistingPOR(row, loRS.getString("sSerialID"));
-                    if ("error".equals((String) poJSON.get("result"))) {
-                        poJSON.put("continue", false);
-                        return poJSON;
-                    }
-                    
-                    PurchaseOrderReceivingSerialList(row).setSerialId(loRS.getString("sSerialID"));
-                    PurchaseOrderReceivingSerialList(row).setSerial01(loRS.getString("sSerial01"));
-                    PurchaseOrderReceivingSerialList(row).setSerial02(loRS.getString("sSerial02"));
-                    PurchaseOrderReceivingSerialList(row).setConductionStickerNo(PurchaseOrderReceivingSerialList(row).InventorySerialRegistration().getConductionStickerNo());
-                    PurchaseOrderReceivingSerialList(row).setPlateNo(PurchaseOrderReceivingSerialList(row).InventorySerialRegistration().getPlateNoP());
-                }
-                
-            } else {
-                if(PurchaseOrderReceivingSerialList(row).getSerialId() != null && !"".equals(PurchaseOrderReceivingSerialList(row).getSerialId())){
-                    PurchaseOrderReceivingSerialList(row).setSerial01("");
-                    PurchaseOrderReceivingSerialList(row).setSerial02("");
-                    PurchaseOrderReceivingSerialList(row).setConductionStickerNo("");
-                    PurchaseOrderReceivingSerialList(row).setPlateNo("");
-                }
-                PurchaseOrderReceivingSerialList(row).setSerialId("");
-            }
-            MiscUtil.close(loRS);
-            
-        } catch (SQLException | GuanzonException ex) {
-            Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
-        }
-        
-        poJSON.put("result", "success");
-        poJSON.put("continue", true);
-        poJSON.put("message", "Record loaded successfully.");
-        return poJSON;
-    }
+//    private JSONObject CheckSerial(String value, int row){
+//        poJSON = new JSONObject();
+//        if(value == null || "".equals(value)){
+//            poJSON.put("continue", true);
+//            return poJSON;
+//        }
+//        try {
+//            String lsSQL = "";
+//            if(Master().getPurpose().equals(PurchaseOrderReceivingStatus.Purpose.REPLACEMENT)){
+//                lsSQL = MiscUtil.addCondition( getPOReturnSerial(),
+//                        " ( b.sSerial01 = " + SQLUtil.toSQL(value)
+//                                + " OR b.sSerial02 = " + SQLUtil.toSQL(value)
+//                                + " ) "
+//                                + " AND a.sTransNox = " + SQLUtil.toSQL(Detail(PurchaseOrderReceivingSerialList(row).getEntryNo()-1).getOrderNo()) );
+//            } else {
+//                Model_Inv_Serial object = new InvModels(poGRider).InventorySerial();
+//                lsSQL = MiscUtil.addCondition( MiscUtil.makeSelect(object),
+//                        " ( sSerial01 = " + SQLUtil.toSQL(value)
+//                                + " OR sSerial02 = " + SQLUtil.toSQL(value)
+//                                + " ) ");
+//            }
+//            
+//            System.out.println("Executing SQL: " + lsSQL);
+//            ResultSet loRS = poGRider.executeQuery(lsSQL);
+//            if (MiscUtil.RecordCount(loRS) >= 0) {
+//                if (loRS.next()) {
+//                    // Print the result set
+//                    System.out.println("sSerialID: " + loRS.getString("sSerialID"));
+//                    System.out.println("sSerial01: " + loRS.getString("sSerial01"));
+//                    System.out.println("sSerial02: " + loRS.getString("sSerial02"));
+//                    System.out.println("------------------------------------------------------------------------------");
+//                    
+//                    //Check Exisiting Receiving
+//                    poJSON = checkExistingPOR(row, loRS.getString("sSerialID"));
+//                    if ("error".equals((String) poJSON.get("result"))) {
+//                        poJSON.put("continue", false);
+//                        return poJSON;
+//                    }
+//                    
+//                    PurchaseOrderReceivingSerialList(row).setSerialId(loRS.getString("sSerialID"));
+//                    PurchaseOrderReceivingSerialList(row).setSerial01(loRS.getString("sSerial01"));
+//                    PurchaseOrderReceivingSerialList(row).setSerial02(loRS.getString("sSerial02"));
+//                    PurchaseOrderReceivingSerialList(row).setConductionStickerNo(PurchaseOrderReceivingSerialList(row).InventorySerialRegistration().getConductionStickerNo());
+//                    PurchaseOrderReceivingSerialList(row).setPlateNo(PurchaseOrderReceivingSerialList(row).InventorySerialRegistration().getPlateNoP());
+//                }
+//                
+//            } else {
+//                if(PurchaseOrderReceivingSerialList(row).getSerialId() != null && !"".equals(PurchaseOrderReceivingSerialList(row).getSerialId())){
+//                    PurchaseOrderReceivingSerialList(row).setSerial01("");
+//                    PurchaseOrderReceivingSerialList(row).setSerial02("");
+//                    PurchaseOrderReceivingSerialList(row).setConductionStickerNo("");
+//                    PurchaseOrderReceivingSerialList(row).setPlateNo("");
+//                }
+//                PurchaseOrderReceivingSerialList(row).setSerialId("");
+//            }
+//            MiscUtil.close(loRS);
+//            
+//        } catch (SQLException | GuanzonException ex) {
+//            Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+//        }
+//        
+//        poJSON.put("result", "success");
+//        poJSON.put("continue", true);
+//        poJSON.put("message", "Record loaded successfully.");
+//        return poJSON;
+//    }
     
     public JSONObject SearchSerial(String value, int row){
         JSONObject foJSON = new JSONObject();
@@ -4154,7 +4159,7 @@ public class PurchaseOrderReceiving extends Transaction {
                     + " LEFT JOIN PO_Detail b on b.sTransNox = a.sTransNox "
                     + " LEFT JOIN Client_Master c ON c.sClientID = a.sSupplier ";
             
-            if(poGRider.isMainOffice() || poGRider.isWarehouse() || "09".equals(psIndustryId)){
+            if(poGRider.isMainOffice() || poGRider.isWarehouse() || PurchaseOrderReceivingStatus.Industry.GENERAL.equals(psIndustryId)){
                 lsSQL = MiscUtil.addCondition(lsSQL, " a.sIndstCdx = " + SQLUtil.toSQL(psIndustryId)
                         + " AND a.sCompnyID LIKE " + SQLUtil.toSQL("%" + psCompanyId)
                         + " AND a.sSupplier LIKE " + SQLUtil.toSQL("%"+ Master().getSupplierId())
@@ -4334,7 +4339,7 @@ public class PurchaseOrderReceiving extends Transaction {
                     + " LEFT JOIN PO_Return_Detail b on b.sTransNox = a.sTransNox "
                     + " LEFT JOIN Client_Master c ON c.sClientID = a.sSupplier ";
             
-            if(poGRider.isMainOffice() || poGRider.isWarehouse() || "09".equals(psIndustryId)){
+            if(poGRider.isMainOffice() || poGRider.isWarehouse() || PurchaseOrderReceivingStatus.Industry.GENERAL.equals(psIndustryId)){
                 lsSQL = MiscUtil.addCondition(lsSQL, " a.sIndstCdx = " + SQLUtil.toSQL(psIndustryId)
                         + " AND a.sCompnyID LIKE " + SQLUtil.toSQL("%" + psCompanyId)
                         + " AND c.sCompnyNm LIKE " + SQLUtil.toSQL("%"+ fsSupplier)
@@ -4704,31 +4709,39 @@ public class PurchaseOrderReceiving extends Transaction {
         switch(columnName){
             case "serial01":
                 switch(Master().getIndustryId()){
-                    case "01":
+                    case PurchaseOrderReceivingStatus.Industry.MOBILEPHONE:
                         return "IMEI 1";
-                    case "02":
-                    case "03":
+                    case PurchaseOrderReceivingStatus.Industry.MOTORCYCLE:
+                    case PurchaseOrderReceivingStatus.Industry.CAR:
+                    case PurchaseOrderReceivingStatus.Industry.CAR_Nissan:
+                    case PurchaseOrderReceivingStatus.Industry.CAR_Any:
                         return "Engine No";
                     default:
                         return "Serial 1";
                 }
             case "serial02":
                 switch(Master().getIndustryId()){
-                    case "01":
+                    case PurchaseOrderReceivingStatus.Industry.MOBILEPHONE:
                         return "IMEI 2";
-                    case "02":
-                    case "03":
+                    case PurchaseOrderReceivingStatus.Industry.MOTORCYCLE:
+                    case PurchaseOrderReceivingStatus.Industry.CAR:
+                    case PurchaseOrderReceivingStatus.Industry.CAR_Nissan:
+                    case PurchaseOrderReceivingStatus.Industry.CAR_Any:
                         return "Frame No";
                     default:
                         return "Serial 2";
                 }
             case "csno":
-                if("03".equals(Master().getIndustryId())){
+                if(PurchaseOrderReceivingStatus.Industry.CAR.equals(Master().getIndustryId())
+                    || PurchaseOrderReceivingStatus.Industry.CAR_Nissan.equals(Master().getIndustryId())
+                    || PurchaseOrderReceivingStatus.Industry.CAR_Any.equals(Master().getIndustryId())){
                     return "CS No ";
                 }
             break;
             case "plateno":
-                if("03".equals(Master().getIndustryId())){
+                if(PurchaseOrderReceivingStatus.Industry.CAR.equals(Master().getIndustryId())
+                    || PurchaseOrderReceivingStatus.Industry.CAR_Nissan.equals(Master().getIndustryId())
+                    || PurchaseOrderReceivingStatus.Industry.CAR_Any.equals(Master().getIndustryId())){
                     return "Plate No ";
                 }
             break;
@@ -4841,60 +4854,60 @@ public class PurchaseOrderReceiving extends Transaction {
         return poJSON;
     }
     
-    private JSONObject checkExistingSerialinDB(String value, String columnName, String stockId)
-            throws SQLException,
-            GuanzonException {
-        JSONObject loJSON = new JSONObject();
-        String lsSQL =    " SELECT "                                                          
-                        + " a.sSerialID   "                                                   
-                        + " , a.sSerial01 "                                                   
-                        + " , a.sSerial02 "                                                  
-                        + " , a.sStockIDx "                                                    
-                        + " , b.sCStckrNo "                                                   
-                        + " , b.sPlateNoP "                                                   
-                        + " FROM Inv_Serial a  "                                              
-                        + " LEFT JOIN Inv_Serial_Registration b ON b.sSerialID = a.sSerialID ";
-        
-        switch(columnName){
-            case "serial01":
-                lsSQL = MiscUtil.addCondition(lsSQL, " a.sStockIDx = " + SQLUtil.toSQL(stockId)
-                                                        + " AND a.sSerial01 = " + SQLUtil.toSQL(value));
-            break;
-            case "serial02":
-                lsSQL = MiscUtil.addCondition(lsSQL, " a.sStockIDx = " + SQLUtil.toSQL(stockId)
-                                                        + " AND a.sSerial02 = " + SQLUtil.toSQL(value));
-            break;
-            case "csno":
-                lsSQL = MiscUtil.addCondition(lsSQL, " a.sStockIDx = " + SQLUtil.toSQL(stockId)
-                                                        + " AND b.sCStckrNo = " + SQLUtil.toSQL(value));
-            break;
-            case "plateno":
-                lsSQL = MiscUtil.addCondition(lsSQL, " a.sStockIDx = " + SQLUtil.toSQL(stockId)
-                                                        + " AND b.sPlateNoP = " + SQLUtil.toSQL(value));
-            break;
-        }
-        
-        System.out.println("Executing SQL: " + lsSQL);
-        ResultSet loRS = poGRider.executeQuery(lsSQL);
-        try {
-            if (MiscUtil.RecordCount(loRS) > 0) {
-                if(loRS.next()){
-                    loJSON.put("result", "success");
-                    loJSON.put("sSerialID", loRS.getString("sSerialID"));
-                    loJSON.put("sSerial01", loRS.getString("sSerial01"));
-                    loJSON.put("sSerial02", loRS.getString("sSerial02"));
-                    loJSON.put("sCStckrNo", loRS.getString("sCStckrNo"));
-                    loJSON.put("sPlateNoP", loRS.getString("sPlateNoP"));
-                }
-            }
-            MiscUtil.close(loRS);
-        } catch (SQLException e) {
-            System.out.println("No record loaded.");
-            loJSON.put("result", "error");
-        }
-        
-        return loJSON;
-    }
+//    private JSONObject checkExistingSerialinDB(String value, String columnName, String stockId)
+//            throws SQLException,
+//            GuanzonException {
+//        JSONObject loJSON = new JSONObject();
+//        String lsSQL =    " SELECT "                                                          
+//                        + " a.sSerialID   "                                                   
+//                        + " , a.sSerial01 "                                                   
+//                        + " , a.sSerial02 "                                                  
+//                        + " , a.sStockIDx "                                                    
+//                        + " , b.sCStckrNo "                                                   
+//                        + " , b.sPlateNoP "                                                   
+//                        + " FROM Inv_Serial a  "                                              
+//                        + " LEFT JOIN Inv_Serial_Registration b ON b.sSerialID = a.sSerialID ";
+//        
+//        switch(columnName){
+//            case "serial01":
+//                lsSQL = MiscUtil.addCondition(lsSQL, " a.sStockIDx = " + SQLUtil.toSQL(stockId)
+//                                                        + " AND a.sSerial01 = " + SQLUtil.toSQL(value));
+//            break;
+//            case "serial02":
+//                lsSQL = MiscUtil.addCondition(lsSQL, " a.sStockIDx = " + SQLUtil.toSQL(stockId)
+//                                                        + " AND a.sSerial02 = " + SQLUtil.toSQL(value));
+//            break;
+//            case "csno":
+//                lsSQL = MiscUtil.addCondition(lsSQL, " a.sStockIDx = " + SQLUtil.toSQL(stockId)
+//                                                        + " AND b.sCStckrNo = " + SQLUtil.toSQL(value));
+//            break;
+//            case "plateno":
+//                lsSQL = MiscUtil.addCondition(lsSQL, " a.sStockIDx = " + SQLUtil.toSQL(stockId)
+//                                                        + " AND b.sPlateNoP = " + SQLUtil.toSQL(value));
+//            break;
+//        }
+//        
+//        System.out.println("Executing SQL: " + lsSQL);
+//        ResultSet loRS = poGRider.executeQuery(lsSQL);
+//        try {
+//            if (MiscUtil.RecordCount(loRS) > 0) {
+//                if(loRS.next()){
+//                    loJSON.put("result", "success");
+//                    loJSON.put("sSerialID", loRS.getString("sSerialID"));
+//                    loJSON.put("sSerial01", loRS.getString("sSerial01"));
+//                    loJSON.put("sSerial02", loRS.getString("sSerial02"));
+//                    loJSON.put("sCStckrNo", loRS.getString("sCStckrNo"));
+//                    loJSON.put("sPlateNoP", loRS.getString("sPlateNoP"));
+//                }
+//            }
+//            MiscUtil.close(loRS);
+//        } catch (SQLException e) {
+//            System.out.println("No record loaded.");
+//            loJSON.put("result", "error");
+//        }
+//        
+//        return loJSON;
+//    }
     
     private JSONObject checkExistingSerialinDB(int row, String columnName)
             throws SQLException,
@@ -5257,7 +5270,8 @@ public class PurchaseOrderReceiving extends Transaction {
         Double ldblTotalDiscAmt =  Master().getDiscount().doubleValue() + (ldblGrossAmt * (Master().getDiscountRate().doubleValue() / 100));
         poCachePayable.Master().setIndustryCode(Master().getIndustryId());
         poCachePayable.Master().setBranchCode(Master().getBranchCode());
-        poCachePayable.Master().setTransactionDate(poGRider.getServerDate()); 
+//        poCachePayable.Master().setTransactionDate(poGRider.getServerDate()); 
+        poCachePayable.Master().setTransactionDate(SQLUtil.toDate(xsDateShort(poGRider.getServerDate()), SQLUtil.FORMAT_SHORT_DATE)); 
         poCachePayable.Master().setCompanyId(Master().getCompanyId());
         poCachePayable.Master().setClientId(Master().getSupplierId());
         poCachePayable.Master().setDueDate(Master().getDueDate());
@@ -5328,7 +5342,8 @@ public class PurchaseOrderReceiving extends Transaction {
         //Cache Payable Trucking Master
         poCachePayableTrucking.Master().setIndustryCode(Master().getIndustryId());
         poCachePayableTrucking.Master().setBranchCode(Master().getBranchCode());
-        poCachePayableTrucking.Master().setTransactionDate(poGRider.getServerDate()); 
+//        poCachePayableTrucking.Master().setTransactionDate(poGRider.getServerDate()); 
+        poCachePayableTrucking.Master().setTransactionDate(SQLUtil.toDate(xsDateShort(poGRider.getServerDate()), SQLUtil.FORMAT_SHORT_DATE)); 
         poCachePayableTrucking.Master().setCompanyId(Master().getCompanyId());
         poCachePayableTrucking.Master().setClientId(Master().getTruckingId());
         poCachePayableTrucking.Master().setDueDate(Master().getDueDate());
@@ -5869,6 +5884,10 @@ public class PurchaseOrderReceiving extends Transaction {
 
     public void setPurpose(String fsPurpose) {
         psPurpose = fsPurpose;
+    }
+    
+    public void isUnitTest(boolean fbIsUnitTest){
+        pbUnitTest = fbIsUnitTest;
     }
     
     public double getQuantity(int row){
@@ -6680,7 +6699,7 @@ public class PurchaseOrderReceiving extends Transaction {
                     poJSON = loInvSerial.openRecord(paOthers.get(lnRow).getSerialId());
                     System.out.println("inv serial open record : " + (String) poJSON.get("message"));
                     //Removed this validation to not return when there is no opened serial in inv_serial_registration in general only
-                    if (!"09".equals(System.getProperty("user.selected.industry"))){
+                    if (!PurchaseOrderReceivingStatus.Industry.GENERAL.equals(System.getProperty("user.selected.industry"))){
                         if ("error".equals((String) poJSON.get("result"))) {
                             return poJSON;
                         }
@@ -6690,7 +6709,7 @@ public class PurchaseOrderReceiving extends Transaction {
                         poJSON = loInvSerial.updateRecord();
                         System.out.println("inv serial update record : " + (String) poJSON.get("message"));
                         //Removed this validation to not return when there is no opened serial in inv_serial_registration in general only
-                        if (!"09".equals(System.getProperty("user.selected.industry"))){
+                        if (!PurchaseOrderReceivingStatus.Industry.GENERAL.equals(System.getProperty("user.selected.industry"))){
                             if ("error".equals((String) poJSON.get("result"))) {
                                 return poJSON;
                             }
@@ -7737,51 +7756,56 @@ public class PurchaseOrderReceiving extends Transaction {
                 lsSerial = "";
             }
             
-            File file = new File(jrxmlPath);
+            if(!pbUnitTest){
+                File file = new File(jrxmlPath);
 
-            if (file.exists()) {
-            } else {
-                poJSON.put("result", "error");
-                poJSON.put("message", "Jasper file does not exist. \nEnsure the file is located in \"D:\\GGC_Maven_Systems\\reports\"");
-                poViewer = null;
-                onPrintedCallback.run();
-                return poJSON;
-            }
-
-            // 3. Create data source
-            JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(orderDetails);
-
-            // 4. Compile and fill report
-            JasperReport jasperReport = JasperCompileManager.compileReport(jrxmlPath);
-            JasperPrint jasperPrint = JasperFillManager.fillReport(
-                    jasperReport,
-                    parameters,
-                    dataSource
-            );
-
-            if (poViewer != null && poViewer.isDisplayable()) {
-                poViewer.dispose();
-                poViewer = null;
-
-            }
-            poViewer = new CustomJasperViewer(jasperPrint, onPrintedCallback);
-            poViewer.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE); 
-            poViewer.setVisible(true);
-            poViewer.toFront();
-            
-            poViewer.addWindowListener(new WindowAdapter() {
-                @Override
-                public void windowClosing(java.awt.event.WindowEvent e) {
+                if (file.exists()) {
+                } else {
+                    poJSON.put("result", "error");
+                    poJSON.put("message", "Jasper file does not exist. \nEnsure the file is located in \"D:\\GGC_Maven_Systems\\reports\"");
                     poViewer = null;
-                    System.out.println("Jasper viewer is closing...");
+                    onPrintedCallback.run();
+                    return poJSON;
                 }
+            
+                // 3. Create data source
+                JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(orderDetails);
 
-                @Override
-                public void windowClosed(java.awt.event.WindowEvent e) {
-                    System.out.println("Jasper viewer closed.");
-                    onPrintedCallback.run(); 
+                // 4. Compile and fill report
+                JasperReport jasperReport = JasperCompileManager.compileReport(jrxmlPath);
+                JasperPrint jasperPrint = JasperFillManager.fillReport(
+                        jasperReport,
+                        parameters,
+                        dataSource
+                );
+
+                if (poViewer != null && poViewer.isDisplayable()) {
+                    poViewer.dispose();
+                    poViewer = null;
+
                 }
-            });
+                poViewer = new CustomJasperViewer(jasperPrint, onPrintedCallback);
+                poViewer.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE); 
+                poViewer.setVisible(true);
+                poViewer.toFront();
+
+                poViewer.addWindowListener(new WindowAdapter() {
+                    @Override
+                    public void windowClosing(java.awt.event.WindowEvent e) {
+                        poViewer = null;
+                        System.out.println("Jasper viewer is closing...");
+                    }
+
+                    @Override
+                    public void windowClosed(java.awt.event.WindowEvent e) {
+                        System.out.println("Jasper viewer closed.");
+                        onPrintedCallback.run();
+                    }
+                });
+            } else {
+                poJSON.put("result", "success");
+                poJSON.put("message", "Print Unit Test");
+            }
             
         } catch (JRException e) {
             System.err.println("Error generating report: " + e.getMessage());
@@ -8105,7 +8129,7 @@ public class PurchaseOrderReceiving extends Transaction {
                 lnSort = 0;
             break;
             case "description":
-                if("01".equals(psIndustryId) || "07".equals(psIndustryId)){ //Mobile Phone / Appliances
+                if(PurchaseOrderReceivingStatus.Industry.MOBILEPHONE.equals(psIndustryId) || PurchaseOrderReceivingStatus.Industry.APPLIANCES.equals(psIndustryId)){ //Mobile Phone / Appliances
                     lsHeader = "IMEI 1»IMEI 2»Barcode»Brand»Description";
                     lsColName = "sSerial01»sSerial02»sBarCodex»xBrandNme»sDescript";
                     lsColCriteria = "j.sSerial01»j.sSerial02»b.sBarCodex»IFNULL(c.sDescript, '')»b.sDescript";
@@ -8118,7 +8142,7 @@ public class PurchaseOrderReceiving extends Transaction {
                 }
             break;
             case "barcode":
-                if("01".equals(psIndustryId) || "07".equals(psIndustryId)){ //Mobile Phone / Appliances
+                if(PurchaseOrderReceivingStatus.Industry.MOBILEPHONE.equals(psIndustryId) || PurchaseOrderReceivingStatus.Industry.APPLIANCES.equals(psIndustryId)){ //Mobile Phone / Appliances
                     lsHeader = "IMEI 1»IMEI 2»Barcode»Brand»Description";
                     lsColName = "sSerial01»sSerial02»sBarCodex»xBrandNme»sDescript";
                     lsColCriteria = "j.sSerial01»j.sSerial02»b.sBarCodex»IFNULL(c.sDescript, '')»b.sDescript";
