@@ -739,87 +739,87 @@ public class PurchaseOrderReceiving extends Transaction {
      * @throws GuanzonException
      * @throws CloneNotSupportedException 
      */
-//    public JSONObject ReturnTransaction(String remarks)
-//            throws ParseException,
-//            SQLException,
-//            GuanzonException,
-//            CloneNotSupportedException {
-//        poJSON = new JSONObject();
-//
-//        String lsStatus = PurchaseOrderReceivingStatus.RETURNED;
-//        boolean lbReturn = true;
-//
-//        if (getEditMode() != EditMode.READY) {
-//            poJSON.put("result", "error");
-//            poJSON.put("message", "No transacton was loaded.");
-//            return poJSON;
-//        }
-//
-//        if (lsStatus.equals((String) poMaster.getValue("cTranStat"))) {
-//            poJSON.put("result", "error");
-//            poJSON.put("message", "Transaction was already returned.");
-//            return poJSON;
-//        }
-//
-//        //validator
-//        poJSON = isEntryOkay(PurchaseOrderReceivingStatus.RETURNED);
-//        if (!"success".equals((String) poJSON.get("result"))) {
-//            return poJSON;
-//        }
-//
-//        if (PurchaseOrderReceivingStatus.CONFIRMED.equals(Master().getTransactionStatus())) {
-//            if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-//                poJSON = ShowDialogFX.getUserApproval(poGRider);
-//                if (!"success".equals((String) poJSON.get("result"))) {
-//                    return poJSON;
-//                } else {
-//                    if(Integer.parseInt(poJSON.get("nUserLevl").toString())<= UserRight.ENCODER){
-//                        poJSON.put("result", "error");
-//                        poJSON.put("message", "User is not an authorized approving officer.");
-//                        return poJSON;
-//                    }
-//                }
-//                
-//                setApproving((String) poJSON.get("sUserIDxx"));
-//            }
-//            
-//            //Set receive qty to Purchase Order
-//            poJSON = setValueToOthers(lsStatus);
-//            if (!"success".equals((String) poJSON.get("result"))) {
-//                return poJSON;
-//            }
-//        }
-//
-//        poGRider.beginTrans("UPDATE STATUS", "ReturnTransaction", SOURCE_CODE, Master().getTransactionNo());
-//        
-//        if (PurchaseOrderReceivingStatus.CONFIRMED.equals(Master().getTransactionStatus())) {
-//            //Update Purchase Order, PO Return
-//            poJSON = saveUpdateOthers(PurchaseOrderReceivingStatus.CONFIRMED);
-//            if (!"success".equals((String) poJSON.get("result"))) {
-//                poGRider.rollbackTrans();
-//                return poJSON;
-//            }
-//        }
-//        
-//        //change status
-//        poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), remarks, lsStatus, !lbReturn, true);
-//        if (!"success".equals((String) poJSON.get("result"))) {
-//            poGRider.rollbackTrans();
-//            return poJSON;
-//        }
-//
-//        poGRider.commitTrans();
-//
-//        poJSON = new JSONObject();
-//        poJSON.put("result", "success");
-//        if (lbReturn) {
-//            poJSON.put("message", "Transaction returned successfully.");
-//        } else {
-//            poJSON.put("message", "Transaction return request submitted successfully.");
-//        }
-//
-//        return poJSON;
-//    }
+    public JSONObject ReturnTransaction(String remarks)
+            throws ParseException,
+            SQLException,
+            GuanzonException,
+            CloneNotSupportedException {
+        poJSON = new JSONObject();
+
+        String lsStatus = PurchaseOrderReceivingStatus.RETURNED;
+        boolean lbReturn = true;
+
+        if (getEditMode() != EditMode.READY) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "No transacton was loaded.");
+            return poJSON;
+        }
+
+        if (lsStatus.equals((String) poMaster.getValue("cTranStat"))) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Transaction was already returned.");
+            return poJSON;
+        }
+
+        //validator
+        poJSON = isEntryOkay(PurchaseOrderReceivingStatus.RETURNED);
+        if (!"success".equals((String) poJSON.get("result"))) {
+            return poJSON;
+        }
+
+        if (PurchaseOrderReceivingStatus.CONFIRMED.equals(Master().getTransactionStatus())) {
+            if (poGRider.getUserLevel() <= UserRight.ENCODER) {
+                poJSON = ShowDialogFX.getUserApproval(poGRider);
+                if (!"success".equals((String) poJSON.get("result"))) {
+                    return poJSON;
+                } else {
+                    if(Integer.parseInt(poJSON.get("nUserLevl").toString())<= UserRight.ENCODER){
+                        poJSON.put("result", "error");
+                        poJSON.put("message", "User is not an authorized approving officer.");
+                        return poJSON;
+                    }
+                }
+                
+                setApproving((String) poJSON.get("sUserIDxx"));
+            }
+            
+            //Set receive qty to Purchase Order
+            poJSON = setValueToOthers(lsStatus);
+            if (!"success".equals((String) poJSON.get("result"))) {
+                return poJSON;
+            }
+        }
+
+        poGRider.beginTrans("UPDATE STATUS", "ReturnTransaction", SOURCE_CODE, Master().getTransactionNo());
+        
+        if (PurchaseOrderReceivingStatus.CONFIRMED.equals(Master().getTransactionStatus())) {
+            //Update Purchase Order, PO Return
+            poJSON = saveUpdateOthers(PurchaseOrderReceivingStatus.CONFIRMED);
+            if (!"success".equals((String) poJSON.get("result"))) {
+                poGRider.rollbackTrans();
+                return poJSON;
+            }
+        }
+        
+        //change status
+        poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), remarks, lsStatus, !lbReturn, true);
+        if (!"success".equals((String) poJSON.get("result"))) {
+            poGRider.rollbackTrans();
+            return poJSON;
+        }
+
+        poGRider.commitTrans();
+
+        poJSON = new JSONObject();
+        poJSON.put("result", "success");
+        if (lbReturn) {
+            poJSON.put("message", "Transaction returned successfully.");
+        } else {
+            poJSON.put("message", "Transaction return request submitted successfully.");
+        }
+
+        return poJSON;
+    }
     
     //SI Posting Confirmation- Arsiela 06-22-2026
     /**
@@ -8630,12 +8630,11 @@ public class PurchaseOrderReceiving extends Transaction {
             // FILTERS
             // -------------------------------
             List<String> lsFilter = new ArrayList<>();
-
             if (dateFrom != null && dateThru != null) {
                 lsFilter.add("a.dTransact BETWEEN "
-                        + SQLUtil.toSQL(java.sql.Date.valueOf(dateFrom))
+                        + SQLUtil.toSQL(xsDateShort(java.sql.Date.valueOf(dateFrom)))
                         + " AND "
-                        + SQLUtil.toSQL(java.sql.Date.valueOf(dateThru)));
+                        + SQLUtil.toSQL(xsDateShort(java.sql.Date.valueOf(dateThru))));
                 dfrom = String.valueOf(dateFrom);
                 dthru = String.valueOf(dateThru);
             }
@@ -8877,9 +8876,9 @@ public class PurchaseOrderReceiving extends Transaction {
 
             if (dateFrom != null && dateThru != null) {
                 lsFilter.add("b.dTransact BETWEEN "
-                        + SQLUtil.toSQL(java.sql.Date.valueOf(dateFrom))
+                        + SQLUtil.toSQL(xsDateShort(java.sql.Date.valueOf(dateFrom)))
                         + " AND "
-                        + SQLUtil.toSQL(java.sql.Date.valueOf(dateThru)));
+                        + SQLUtil.toSQL(xsDateShort(java.sql.Date.valueOf(dateThru))));
                 dfrom = String.valueOf(dateFrom);
                 dthru = String.valueOf(dateThru);
             }
