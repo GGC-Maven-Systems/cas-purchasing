@@ -794,11 +794,7 @@ public class PurchaseOrder extends Transaction {
 
     public JSONObject ConfirmTransaction(String remarks) throws ParseException, SQLException, CloneNotSupportedException, GuanzonException {
         poJSON = new JSONObject();
-
-        //mac 2026.02.27
-        //  call approve transaction upon confirmation on class and deactivate the approval UI
-        //check the status of the transaction
-        //kapag OPEN, idaan mo muna sa confirmation, pag hindi naman idaan mo sa approval
+        
         if (Master().getTransactionStatus().equals(PurchaseOrderStatus.OPEN)) {
             String lsStatus = PurchaseOrderStatus.CONFIRMED;
 
@@ -932,7 +928,6 @@ public class PurchaseOrder extends Transaction {
 
             poGRider.commitTrans();
 
-            //mac 2026.02.27
             Master().setTransactionStatus(PurchaseOrderStatus.CONFIRMED);
         }
 
@@ -1030,7 +1025,6 @@ public class PurchaseOrder extends Transaction {
 
                         poGRider.commitTrans();
 
-                        //mac 2026.03.07
                         poJSON = new JSONObject();
                         poJSON.put("result", "success");
 
