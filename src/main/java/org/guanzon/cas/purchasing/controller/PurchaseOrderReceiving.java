@@ -561,12 +561,14 @@ public class PurchaseOrderReceiving extends Transaction {
                         //check if approving officer is authorized
                         String lsUserIDxx = poJSON.get("sUserIDxx").toString();
                         //check if current user is authorized to approved this transaction
-                        poJSON = check.authTrans((String) loJson.get("sAuthType"), poGRider.getUserID());
+                        poJSON = check.authTrans((String) loJson.get("sAuthType"), lsUserIDxx);
                         //user is not authorized
                         if(!"success".equalsIgnoreCase((String)poJSON.get("result"))){
                             return poJSON;
                         }
                         setApproving(lsUserIDxx);
+                    } else {
+                        setApproving(poGRider.getUserID());
                     }
                 }
 
@@ -577,7 +579,7 @@ public class PurchaseOrderReceiving extends Transaction {
                     return poJSON;
                 }
                 
-                check.postAuth();
+                return check.postAuth();
             }
         }
         
@@ -610,8 +612,11 @@ public class PurchaseOrderReceiving extends Transaction {
             return poJSON;
         }
         
+        poGRider.beginTrans("UPDATE STATUS", "ConfirmTransaction", SOURCE_CODE, Master().getTransactionNo());
+        
         poJSON = isEntryOkay(lsStatus);
         if (!"success".equals((String) poJSON.get("result"))) {
+            poGRider.rollbackTrans();
             return poJSON;
         }
         
@@ -620,6 +625,7 @@ public class PurchaseOrderReceiving extends Transaction {
             poJSON = seekApproval();
             
             if(!"success".equalsIgnoreCase((String)poJSON.get("result"))){
+                poGRider.rollbackTrans();
                 return poJSON;
             }
         }
@@ -627,10 +633,9 @@ public class PurchaseOrderReceiving extends Transaction {
         //Set receive qty to Purchase Order / PO Return
         poJSON = setValueToOthers(lsStatus);
         if (!"success".equals((String) poJSON.get("result"))) {
+            poGRider.rollbackTrans();
             return poJSON;
         }
-
-        poGRider.beginTrans("UPDATE STATUS", "ConfirmTransaction", SOURCE_CODE, Master().getTransactionNo());
         
         try {
             //Update Purchase Order / PO Return 
