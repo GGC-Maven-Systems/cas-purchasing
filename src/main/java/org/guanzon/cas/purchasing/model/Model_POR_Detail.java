@@ -9,15 +9,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Date;
 import org.guanzon.appdriver.agent.services.Model;
+import org.guanzon.appdriver.agent.services.ReferenceCache;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.base.SQLUtil;
 import org.guanzon.appdriver.constant.EditMode;
-import org.guanzon.cas.inv.model.Model_Inv_Master;
 import org.guanzon.cas.inv.model.Model_Inventory;
 import org.guanzon.cas.inv.services.InvModels;
-import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Detail;
-import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Master;
 import org.guanzon.cas.parameter.model.Model_Brand;
 import org.guanzon.cas.parameter.services.ParamModels;
 import org.guanzon.cas.purchasing.services.PurchaseOrderModels;
@@ -33,11 +31,11 @@ public class Model_POR_Detail extends Model{
     String psBrandId = "";
     
     //reference objects
+    //poBrand/poInventory/poPurchaseOrder/poPurchaseOrderReturn/poPurchaseOrderReturnDetail are
+    //intentionally NOT constructed in initialize() - see their accessors below, which build them
+    //lazily on first access so opening this record never touches those tables.
     Model_Brand poBrand;
-    Model_Inv_Stock_Request_Master poInvStockMaster;
-    Model_Inv_Stock_Request_Detail poInvStockDetail;
     Model_Inventory poInventory;
-    Model_Inv_Master poInventoryMaster;
     Model_PO_Master poPurchaseOrder;
     Model_POReturn_Master poPurchaseOrderReturn;
     Model_POReturn_Detail poPurchaseOrderReturnDetail;
@@ -74,21 +72,7 @@ public class Model_POR_Detail extends Model{
 
             ID = "sTransNox";
             ID2 = "nEntryNox";
-            
-            //initialize reference objects
-            ParamModels model = new ParamModels(poGRider);
-            poBrand = model.Brand();
-            
-            InvModels invModel = new InvModels(poGRider); 
-            poInventory = invModel.Inventory();
-            
-            Model_PO_Master purchaseOrderModel = new PurchaseOrderModels(poGRider).PurchaseOrderMaster(); 
-            poPurchaseOrder = purchaseOrderModel;
-            PurchaseOrderReturnModels purchaseOrderReturnModel = new PurchaseOrderReturnModels(poGRider);
-            poPurchaseOrderReturn = purchaseOrderReturnModel.PurchaseOrderReturnMaster();
-            poPurchaseOrderReturnDetail = purchaseOrderReturnModel.PurchaseOrderReturnDetails();
-            //end - initialize reference objects
-            
+
             pnEditMode = EditMode.UNKNOWN;
         } catch (SQLException e) {
             logwrapr.severe(e.getMessage());
@@ -287,6 +271,10 @@ public class Model_POR_Detail extends Model{
     
     //reference object models
     public Model_Inventory Inventory() throws SQLException, GuanzonException {
+        if (poInventory == null) {
+            poInventory = new InvModels(poGRider).Inventory();
+        }
+
         if (!"".equals((String) getValue("sStockIDx"))) {
             if (poInventory.getEditMode() == EditMode.READY
                     && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
@@ -306,8 +294,12 @@ public class Model_POR_Detail extends Model{
             return poInventory;
         }
     }
-    
+
     public Model_Inventory Supersede() throws SQLException, GuanzonException {
+        if (poInventory == null) {
+            poInventory = new InvModels(poGRider).Inventory();
+        }
+
         if (!"".equals((String) getValue("sReplacID"))) {
             if (poInventory.getEditMode() == EditMode.READY
                     && poInventory.getStockId().equals((String) getValue("sReplacID"))) {
@@ -329,17 +321,26 @@ public class Model_POR_Detail extends Model{
     }
     
     public Model_Brand Brand() throws GuanzonException, SQLException {
+        if (poBrand == null) {
+            poBrand = new ParamModels(poGRider).Brand();
+        }
+
         if (!"".equals((String) getValue("sStockIDx")) && (String) getValue("sStockIDx") != null) {
             setBrandId(Inventory().getBrandId());
         }
-        
+
         if (!"".equals(getBrandId())) {
             if (poBrand.getEditMode() == EditMode.READY
                     && poBrand.getBrandId().equals(getBrandId())) {
                 return poBrand;
             } else {
+                if (ReferenceCache.tryLoad("Brand", getBrandId(), poBrand)) {
+                    return poBrand;
+                }
+
                 poJSON = poBrand.openRecord(getBrandId());
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Brand", getBrandId(), poBrand);
                     return poBrand;
                 } else {
                     poBrand.initialize();
@@ -351,8 +352,12 @@ public class Model_POR_Detail extends Model{
             return poBrand;
         }
     }
-    
+
     public Model_PO_Master PurchaseOrderMaster() throws SQLException, GuanzonException {
+            if (poPurchaseOrder == null) {
+                poPurchaseOrder = new PurchaseOrderModels(poGRider).PurchaseOrderMaster();
+            }
+
             if (!"".equals((String) getValue("sOrderNox"))) {
                 if (poPurchaseOrder.getEditMode() == EditMode.READY
                         && poPurchaseOrder.getTransactionNo().equals((String) getValue("sOrderNox"))) {
@@ -374,6 +379,10 @@ public class Model_POR_Detail extends Model{
     }
     
     public Model_POReturn_Master PurchaseOrderReturnMaster() throws SQLException, GuanzonException {
+        if (poPurchaseOrderReturn == null) {
+            poPurchaseOrderReturn = new PurchaseOrderReturnModels(poGRider).PurchaseOrderReturnMaster();
+        }
+
         if (!"".equals((String) getValue("sOrderNox"))) {
             if (poPurchaseOrderReturn.getEditMode() == EditMode.READY
                     && poPurchaseOrderReturn.getTransactionNo().equals((String) getValue("sOrderNox"))) {
@@ -395,6 +404,10 @@ public class Model_POR_Detail extends Model{
     }
     
     public Model_POReturn_Detail PurchaseOrderReturnDetail() throws SQLException, GuanzonException {
+        if (poPurchaseOrderReturnDetail == null) {
+            poPurchaseOrderReturnDetail = new PurchaseOrderReturnModels(poGRider).PurchaseOrderReturnDetails();
+        }
+
         if (!"".equals((String) getValue("sOrderNox"))) {
             if (poPurchaseOrderReturnDetail.getEditMode() == EditMode.READY
                     && poPurchaseOrderReturnDetail.getTransactionNo().equals((String) getValue("sOrderNox"))

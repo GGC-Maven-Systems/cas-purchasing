@@ -10,13 +10,13 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.guanzon.appdriver.agent.services.Model;
+import org.guanzon.appdriver.agent.services.ReferenceCache;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.constant.EditMode;
 import org.guanzon.cas.parameter.model.Model_Branch;
 import org.guanzon.cas.parameter.model.Model_Category;
 import org.guanzon.cas.parameter.model.Model_Category_Level2;
-import org.guanzon.cas.parameter.model.Model_Company;
 import org.guanzon.cas.parameter.model.Model_Department;
 import org.guanzon.cas.parameter.model.Model_Industry;
 import org.guanzon.cas.parameter.services.ParamModels;
@@ -32,14 +32,17 @@ public class Model_PO_Quotation_Request_Master extends Model {
     String psSearchBranch = "";
     String psSearchCategory = "";
     
+    //All reference fields below are intentionally NOT constructed in initialize() - see their
+    //accessors, which build them lazily on first access so opening this record never touches
+    //those tables. (poCompany was previously eager-constructed here too but had no accessor
+    //anywhere in this class - removed as a dead field.)
     Model_Branch poBranch;
     Model_Branch poDestination;
     Model_Industry poIndustry;
-    Model_Company poCompany;
     Model_Department poDepartment;
     Model_Category poCategory;
     Model_Category_Level2 poCategory2;
-    
+
     @Override
     public void initialize() {
         try {
@@ -67,17 +70,6 @@ public class Model_PO_Quotation_Request_Master extends Model {
             poEntity.absolute(1);
 
             ID = "sTransNox";
-
-            //initialize reference objects
-            ParamModels model = new ParamModels(poGRider);
-            poBranch = model.Branch();
-            poDestination = model.Branch(); 
-            poIndustry = model.Industry();
-            poCompany = model.Company();
-            poDepartment = model.Department();
-            poCategory2 = model.Category2();
-            poCategory = model.Category(); 
-//            end - initialize reference objects
 
             pnEditMode = EditMode.UNKNOWN;
         } catch (SQLException e) {
@@ -246,14 +238,23 @@ public class Model_PO_Quotation_Request_Master extends Model {
 
     //reference object models
     public Model_Branch Branch() throws SQLException, GuanzonException {
+        if (poBranch == null) {
+            poBranch = new ParamModels(poGRider).Branch();
+        }
+
         if (!"".equals((String) getValue("sBranchCd"))) {
             if (poBranch.getEditMode() == EditMode.READY
                     && poBranch.getBranchCode().equals((String) getValue("sBranchCd"))) {
                 return poBranch;
             } else {
+                if (ReferenceCache.tryLoad("Branch", (String) getValue("sBranchCd"), poBranch)) {
+                    return poBranch;
+                }
+
                 poJSON = poBranch.openRecord((String) getValue("sBranchCd"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Branch", (String) getValue("sBranchCd"), poBranch);
                     return poBranch;
                 } else {
                     poBranch.initialize();
@@ -265,16 +266,25 @@ public class Model_PO_Quotation_Request_Master extends Model {
             return poBranch;
         }
     }
-    
+
     public Model_Branch Destination() throws SQLException, GuanzonException {
+        if (poDestination == null) {
+            poDestination = new ParamModels(poGRider).Branch();
+        }
+
         if (!"".equals((String) getValue("sDestinat"))) {
             if (poDestination.getEditMode() == EditMode.READY
                     && poDestination.getBranchCode().equals((String) getValue("sDestinat"))) {
                 return poDestination;
             } else {
+                if (ReferenceCache.tryLoad("Branch", (String) getValue("sDestinat"), poDestination)) {
+                    return poDestination;
+                }
+
                 poJSON = poDestination.openRecord((String) getValue("sDestinat"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Branch", (String) getValue("sDestinat"), poDestination);
                     return poDestination;
                 } else {
                     poDestination.initialize();
@@ -288,14 +298,23 @@ public class Model_PO_Quotation_Request_Master extends Model {
     }
 
     public Model_Industry Industry() throws SQLException, GuanzonException {
+        if (poIndustry == null) {
+            poIndustry = new ParamModels(poGRider).Industry();
+        }
+
         if (!"".equals((String) getValue("sIndstCdx"))) {
             if (poIndustry.getEditMode() == EditMode.READY
                     && poIndustry.getIndustryId().equals((String) getValue("sIndstCdx"))) {
                 return poIndustry;
             } else {
+                if (ReferenceCache.tryLoad("Industry", (String) getValue("sIndstCdx"), poIndustry)) {
+                    return poIndustry;
+                }
+
                 poJSON = poIndustry.openRecord((String) getValue("sIndstCdx"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Industry", (String) getValue("sIndstCdx"), poIndustry);
                     return poIndustry;
                 } else {
                     poIndustry.initialize();
@@ -307,16 +326,25 @@ public class Model_PO_Quotation_Request_Master extends Model {
             return poIndustry;
         }
     }
-    
+
     public Model_Category Category() throws GuanzonException, SQLException {
+        if (poCategory == null) {
+            poCategory = new ParamModels(poGRider).Category();
+        }
+
         if (!"".equals((String) getValue("sCategrCd"))) {
             if (poCategory.getEditMode() == EditMode.READY
                     && poCategory.getCategoryId().equals((String) getValue("sCategrCd"))) {
                 return poCategory;
             } else {
+                if (ReferenceCache.tryLoad("Category", (String) getValue("sCategrCd"), poCategory)) {
+                    return poCategory;
+                }
+
                 poJSON = poCategory.openRecord((String) getValue("sCategrCd"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Category", (String) getValue("sCategrCd"), poCategory);
                     return poCategory;
                 } else {
                     poCategory.initialize();
@@ -328,16 +356,25 @@ public class Model_PO_Quotation_Request_Master extends Model {
             return poCategory;
         }
     }
-    
+
     public Model_Category_Level2 Category2() throws GuanzonException, SQLException {
+        if (poCategory2 == null) {
+            poCategory2 = new ParamModels(poGRider).Category2();
+        }
+
         if (!"".equals((String) getValue("sCategCd2"))) {
             if (poCategory2.getEditMode() == EditMode.READY
                     && poCategory2.getCategoryId().equals((String) getValue("sCategCd2"))) {
                 return poCategory2;
             } else {
+                if (ReferenceCache.tryLoad("Category_Level2", (String) getValue("sCategCd2"), poCategory2)) {
+                    return poCategory2;
+                }
+
                 poJSON = poCategory2.openRecord((String) getValue("sCategCd2"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Category_Level2", (String) getValue("sCategCd2"), poCategory2);
                     return poCategory2;
                 } else {
                     poCategory2.initialize();
@@ -351,14 +388,23 @@ public class Model_PO_Quotation_Request_Master extends Model {
     }
 
     public Model_Department Department() throws SQLException, GuanzonException {
+        if (poDepartment == null) {
+            poDepartment = new ParamModels(poGRider).Department();
+        }
+
         if (!"".equals((String) getValue("sDeptIDxx"))) {
             if (poDepartment.getEditMode() == EditMode.READY
                     && poDepartment.getDepartmentId().equals((String) getValue("sDeptIDxx"))) {
                 return poDepartment;
             } else {
+                if (ReferenceCache.tryLoad("Department", (String) getValue("sDeptIDxx"), poDepartment)) {
+                    return poDepartment;
+                }
+
                 poJSON = poDepartment.openRecord((String) getValue("sDeptIDxx"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Department", (String) getValue("sDeptIDxx"), poDepartment);
                     return poDepartment;
                 } else {
                     poDepartment.initialize();
