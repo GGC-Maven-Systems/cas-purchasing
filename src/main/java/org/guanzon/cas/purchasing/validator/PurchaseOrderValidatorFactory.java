@@ -23,10 +23,6 @@ public class PurchaseOrderValidatorFactory {
 
             case PurchaseOrderStatus.IndustryCode.PEDRITOS:
                 return new PurchaseOrder_LP();
-
-            case PurchaseOrderStatus.IndustryCode.GENERAL:
-                return new PurchaseOrder_LP();
-
             default:
                 return new PurchaseOrder_General();
         }
