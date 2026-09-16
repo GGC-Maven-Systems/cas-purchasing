@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Date;
 import org.guanzon.appdriver.agent.services.Model;
+import org.guanzon.appdriver.agent.services.ReferenceCache;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.base.SQLUtil;
@@ -29,8 +30,11 @@ import org.json.simple.JSONObject;
  */
 public class Model_POR_Serial extends Model {
     
-    //reference objects  
-    Model_Inventory poInventory;  
+    //reference objects
+    //All reference fields below are intentionally NOT constructed in initialize() - see their
+    //accessors, which build them lazily on first access so opening this record never touches
+    //those tables.
+    Model_Inventory poInventory;
     Model_Inv_Location poLocation;  
     Model_Inv_Serial poInvSerial; 
     Model_Inv_Serial_Registration poInvSerialRegistration; 
@@ -59,23 +63,7 @@ public class Model_POR_Serial extends Model {
             ID = "sTransNox";
             ID2 = "nEntryNox";
             ID3 = "sSerialID";
-            
-            //initialize reference objects
-            ParamModels location = new ParamModels(poGRider);
-            poLocation = location.InventoryLocation();
-            
-            InvModels invSerial = new InvModels(poGRider); 
-            poInvSerial = invSerial.InventorySerial();
-            poInvSerialRegistration = invSerial.InventorySerialRegistration();
-            
-            InvModels invModel = new InvModels(poGRider); 
-            poInventory = invModel.Inventory();
-            
-            PurchaseOrderReceivingModels porDetail = new PurchaseOrderReceivingModels(poGRider); 
-            poPorDetail = porDetail.PurchaseOrderReceivingDetails();
-            
-            //end - initialize reference objects
-            
+
             pnEditMode = EditMode.UNKNOWN;
         } catch (SQLException e) {
             logwrapr.severe(e.getMessage());
@@ -186,6 +174,10 @@ public class Model_POR_Serial extends Model {
     
     //reference object models
     public Model_Inventory Inventory() throws SQLException, GuanzonException {
+        if (poInventory == null) {
+            poInventory = new InvModels(poGRider).Inventory();
+        }
+
         if (!"".equals((String) getValue("sStockIDx"))) {
             if (poInventory.getEditMode() == EditMode.READY
                     && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
@@ -206,15 +198,24 @@ public class Model_POR_Serial extends Model {
         }
     }
     
-    public Model_Inv_Location Location() throws SQLException, GuanzonException { 
+    public Model_Inv_Location Location() throws SQLException, GuanzonException {
+        if (poLocation == null) {
+            poLocation = new ParamModels(poGRider).InventoryLocation();
+        }
+
         if (!"".equals((String) getValue("sLocatnID"))) {
             if (poLocation.getEditMode() == EditMode.READY
                     && poLocation.getLocationId().equals((String) getValue("sLocatnID"))) {
                 return poLocation;
             } else {
+                if (ReferenceCache.tryLoad("Inv_Location", (String) getValue("sLocatnID"), poLocation)) {
+                    return poLocation;
+                }
+
                 poJSON = poLocation.openRecord((String) getValue("sLocatnID"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Inv_Location", (String) getValue("sLocatnID"), poLocation);
                     return poLocation;
                 } else {
                     poLocation.initialize();
@@ -228,6 +229,10 @@ public class Model_POR_Serial extends Model {
     }
     
     public Model_Inv_Serial InventorySerial() throws SQLException, GuanzonException {
+        if (poInvSerial == null) {
+            poInvSerial = new InvModels(poGRider).InventorySerial();
+        }
+
         if (!"".equals((String) getValue("sSerialID"))) {
             if (poInvSerial.getEditMode() == EditMode.READY
                     && poInvSerial.getStockId().equals((String) getValue("sSerialID"))) {
@@ -249,6 +254,10 @@ public class Model_POR_Serial extends Model {
     }
     
     public Model_Inv_Serial_Registration InventorySerialRegistration() throws SQLException, GuanzonException {
+        if (poInvSerialRegistration == null) {
+            poInvSerialRegistration = new InvModels(poGRider).InventorySerialRegistration();
+        }
+
         if (!"".equals((String) getValue("sSerialID"))) {
             if (poInvSerialRegistration.getEditMode() == EditMode.READY
                     && poInvSerialRegistration.getSerialId().equals((String) getValue("sSerialID"))) {
@@ -270,6 +279,10 @@ public class Model_POR_Serial extends Model {
     }
     
     public Model_Inv_Serial_Ledger InventorySerialLedger() throws SQLException, GuanzonException {
+        if (poInvSerialLedger == null) {
+            poInvSerialLedger = new InvModels(poGRider).InventorySerialLedger();
+        }
+
         if (!"".equals((String) getValue("sSerialID"))) {
             if (poInvSerialLedger.getEditMode() == EditMode.READY
                     && poInvSerialLedger.getSerialId().equals((String) getValue("sSerialID"))) {
@@ -321,6 +334,10 @@ public class Model_POR_Serial extends Model {
     }
     
     public Model_POR_Detail PurchaseOrderReceivingDetails() throws SQLException, GuanzonException {
+        if (poPorDetail == null) {
+            poPorDetail = new PurchaseOrderReceivingModels(poGRider).PurchaseOrderReceivingDetails();
+        }
+
         if (!"".equals((String) getValue("sStockIDx"))) {
             if (poPorDetail.getEditMode() == EditMode.READY
                     && (poPorDetail.getEntryNo() == (int) getValue("nEntryNox"))) {

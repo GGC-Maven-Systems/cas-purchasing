@@ -9,18 +9,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Date;
 import org.guanzon.appdriver.agent.services.Model;
+import org.guanzon.appdriver.agent.services.ReferenceCache;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.base.SQLUtil;
 import org.guanzon.appdriver.constant.EditMode;
-import org.guanzon.cas.inv.model.Model_Inv_Master;
 import org.guanzon.cas.inv.model.Model_Inventory;
 import org.guanzon.cas.inv.services.InvModels;
 import org.guanzon.cas.parameter.model.Model_Brand;
-import org.guanzon.cas.parameter.model.Model_Category_Level2;
 import org.guanzon.cas.parameter.model.Model_Color;
 import org.guanzon.cas.parameter.model.Model_Model;
-import org.guanzon.cas.parameter.model.Model_Model_Variant;
+import org.guanzon.cas.parameter.services.ParamModels;
 import org.json.simple.JSONObject;
 
 /**
@@ -33,15 +32,16 @@ public class Model_PO_Quotation_Detail extends Model {
     String psModelId = "";
     
     //reference objects
+    //All reference fields below are intentionally NOT constructed in initialize() - see their
+    //accessors, which build them lazily on first access so opening this record never touches
+    //those tables. (poModelVariant/poInvMaster/poCategory were previously eager-constructed
+    //here too but had no accessor anywhere in this class - removed as dead fields.)
     Model_Brand poBrand;
     Model_Model poModel;
-    Model_Model_Variant poModelVariant;
     Model_Color poColor;
     Model_Inventory poInventory;
     Model_Inventory poReplaced;
-    Model_Inv_Master poInvMaster;
-    Model_Category_Level2 poCategory;
-    
+
     @Override
     public void initialize() {
         try {
@@ -68,13 +68,6 @@ public class Model_PO_Quotation_Detail extends Model {
 
             ID = "sTransNox";
             ID2 = "nEntryNox";
-
-            //initialize reference objects
-            
-            InvModels invModel = new InvModels(poGRider); 
-            poInventory = invModel.Inventory();
-            poReplaced = invModel.Inventory();
-            //end - initialize reference objects
 
             pnEditMode = EditMode.UNKNOWN;
         } catch (SQLException e) {
@@ -217,18 +210,27 @@ public class Model_PO_Quotation_Detail extends Model {
 
     //reference object models
     public Model_Brand Brand() throws GuanzonException, SQLException {
+        if (poBrand == null) {
+            poBrand = new ParamModels(poGRider).Brand();
+        }
+
         if (!"".equals((String) getValue("sStockIDx")) && (String) getValue("sStockIDx") != null) {
             psBrandId = Inventory().getBrandId();
             setBrandId(Inventory().getBrandId());
         }
-        
+
         if (!"".equals(getBrandId())) {
             if (poBrand.getEditMode() == EditMode.READY
                     && poBrand.getBrandId().equals(getBrandId())) {
                 return poBrand;
             } else {
+                if (ReferenceCache.tryLoad("Brand", getBrandId(), poBrand)) {
+                    return poBrand;
+                }
+
                 poJSON = poBrand.openRecord(getBrandId());
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Brand", getBrandId(), poBrand);
                     return poBrand;
                 } else {
                     poBrand.initialize();
@@ -240,20 +242,29 @@ public class Model_PO_Quotation_Detail extends Model {
             return poBrand;
         }
     }
-    
+
     public Model_Model Model() throws SQLException, GuanzonException {
+        if (poModel == null) {
+            poModel = new ParamModels(poGRider).Model();
+        }
+
         if (!"".equals((String) getValue("sStockIDx")) && (String) getValue("sStockIDx") != null) {
             psModelId = Inventory().getModelId();
             setModelId(Inventory().getModelId());
         }
-        
+
         if (!"".equals(getBrandId())) {
             if (poModel.getEditMode() == EditMode.READY
                     && poModel.getBrandId().equals(getBrandId())) {
                 return poModel;
             } else {
+                if (ReferenceCache.tryLoad("Model", getBrandId(), poModel)) {
+                    return poModel;
+                }
+
                 poJSON = poModel.openRecord(getBrandId());
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Model", getBrandId(), poModel);
                     return poModel;
                 } else {
                     poModel.initialize();
@@ -265,8 +276,12 @@ public class Model_PO_Quotation_Detail extends Model {
             return poModel;
         }
     }
-    
+
     public Model_Inventory Inventory() throws SQLException, GuanzonException {
+        if (poInventory == null) {
+            poInventory = new InvModels(poGRider).Inventory();
+        }
+
         if (!"".equals((String) getValue("sStockIDx"))) {
             if (poInventory.getEditMode() == EditMode.READY
                     && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
@@ -288,6 +303,10 @@ public class Model_PO_Quotation_Detail extends Model {
     }
     
     public Model_Inventory ReplacedInventory() throws SQLException, GuanzonException {
+        if (poReplaced == null) {
+            poReplaced = new InvModels(poGRider).Inventory();
+        }
+
         if (!"".equals((String) getValue("sReplacID"))) {
             if (poReplaced.getEditMode() == EditMode.READY
                     && poReplaced.getStockId().equals((String) getValue("sReplacID"))) {

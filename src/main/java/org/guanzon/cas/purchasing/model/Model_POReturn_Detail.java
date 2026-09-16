@@ -29,6 +29,9 @@ public class Model_POReturn_Detail extends Model{
     Number psReceiveQty = 1;
     
     //reference objects
+    //All reference fields below are intentionally NOT constructed in initialize() - see their
+    //accessors, which build them lazily on first access so opening this record never touches
+    //those tables.
     Model_Inventory poInventory;
     Model_Inv_Serial poInvSerial;
     Model_Inv_Serial_Registration poInvSerialRegistration;
@@ -60,17 +63,7 @@ public class Model_POReturn_Detail extends Model{
 
             ID = "sTransNox";
             ID2 = "nEntryNox";
-            
-            //initialize reference objects
-            InvModels invModel = new InvModels(poGRider); 
-            poInventory = invModel.Inventory();
-            poInvSerial = invModel.InventorySerial();
-            poInvSerialRegistration = invModel.InventorySerialRegistration();
-            
-            Model_PO_Master purchaseOrderModel = new PurchaseOrderModels(poGRider).PurchaseOrderMaster(); 
-            poPurchaseOrder = purchaseOrderModel;
-            //end - initialize reference objects
-            
+
             pnEditMode = EditMode.UNKNOWN;
         } catch (SQLException e) {
             logwrapr.severe(e.getMessage());
@@ -209,6 +202,10 @@ public class Model_POReturn_Detail extends Model{
     
     //reference object models
     public Model_Inventory Inventory() throws SQLException, GuanzonException {
+        if (poInventory == null) {
+            poInventory = new InvModels(poGRider).Inventory();
+        }
+
         if (!"".equals((String) getValue("sStockIDx"))) {
             if (poInventory.getEditMode() == EditMode.READY
                     && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
@@ -230,6 +227,10 @@ public class Model_POReturn_Detail extends Model{
     }
     
     public Model_Inv_Serial InventorySerial() throws SQLException, GuanzonException {
+        if (poInvSerial == null) {
+            poInvSerial = new InvModels(poGRider).InventorySerial();
+        }
+
         if (!"".equals((String) getValue("sSerialID"))) {
             if (poInvSerial.getEditMode() == EditMode.READY
                     && poInvSerial.getSerialId().equals((String) getValue("sSerialID"))) {
@@ -251,6 +252,10 @@ public class Model_POReturn_Detail extends Model{
     }
     
     public Model_Inv_Serial_Registration InventorySerialRegistration() throws SQLException, GuanzonException {
+        if (poInvSerialRegistration == null) {
+            poInvSerialRegistration = new InvModels(poGRider).InventorySerialRegistration();
+        }
+
         if (!"".equals((String) getValue("sSerialID"))) {
             if (poInvSerialRegistration.getEditMode() == EditMode.READY
                     && poInvSerialRegistration.getSerialId().equals((String) getValue("sSerialID"))) {
@@ -272,6 +277,10 @@ public class Model_POReturn_Detail extends Model{
     }
     
     public Model_PO_Master PurchaseOrderMaster() throws SQLException, GuanzonException {
+            if (poPurchaseOrder == null) {
+                poPurchaseOrder = new PurchaseOrderModels(poGRider).PurchaseOrderMaster();
+            }
+
             if (!"".equals((String) getValue("sSourceNo"))) {
                 if (poPurchaseOrder.getEditMode() == EditMode.READY
                         && poPurchaseOrder.getTransactionNo().equals((String) getValue("sSourceNo"))) {

@@ -10,6 +10,7 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.guanzon.appdriver.agent.services.Model;
+import org.guanzon.appdriver.agent.services.ReferenceCache;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.constant.EditMode;
@@ -18,9 +19,7 @@ import org.guanzon.cas.client.model.Model_Client_Master;
 import org.guanzon.cas.client.model.Model_Client_Mobile;
 import org.guanzon.cas.client.services.ClientModels;
 import org.guanzon.cas.parameter.model.Model_Branch;
-import org.guanzon.cas.parameter.model.Model_Category_Level2;
 import org.guanzon.cas.parameter.model.Model_Company;
-import org.guanzon.cas.parameter.model.Model_Department;
 import org.guanzon.cas.parameter.model.Model_Industry;
 import org.guanzon.cas.parameter.model.Model_Term;
 import org.guanzon.cas.parameter.services.ParamModels;
@@ -34,16 +33,17 @@ import org.guanzon.cas.purchasing.status.POQuotationStatus;
  */
 public class Model_PO_Quotation_Master extends Model {
     
+    //All reference fields below are intentionally NOT constructed in initialize() - see their
+    //accessors, which build them lazily on first access so opening this record never touches
+    //those tables.
     Model_Industry poIndustry;
     Model_Company poCompany;
     Model_Branch poBranch;
-    Model_Department poDepartment;
-    Model_Category_Level2 poCategory;
     Model_Term poTerm;
     Model_Client_Master poSupplier;
     Model_Client_Address poSupplierAddress;
     Model_Client_Mobile poSupplierMobile;
-    
+
     Model_PO_Quotation_Request_Master poQuotationRequest;
     
     @Override
@@ -83,24 +83,6 @@ public class Model_PO_Quotation_Master extends Model {
             poEntity.absolute(1);
 
             ID = "sTransNox";
-
-            //initialize reference objects
-            ParamModels model = new ParamModels(poGRider);
-            poBranch = model.Branch();
-            poIndustry = model.Industry();
-            poCompany = model.Company();
-            poDepartment = model.Department();
-            poCategory = model.Category2();
-            poTerm = model.Term();
-            
-            ClientModels clientModel = new ClientModels(poGRider);
-            poSupplier = clientModel.ClientMaster();
-            poSupplierAddress = clientModel.ClientAddress();
-            poSupplierMobile = clientModel.ClientMobile();
-            
-            QuotationModels quotationModel = new QuotationModels(poGRider);
-            poQuotationRequest = quotationModel.POQuotationRequestMaster();
-//            end - initialize reference objects
 
             pnEditMode = EditMode.UNKNOWN;
         } catch (SQLException e) {
@@ -441,14 +423,23 @@ public class Model_PO_Quotation_Master extends Model {
 
     //reference object models
     public Model_Branch Branch() throws SQLException, GuanzonException {
+        if (poBranch == null) {
+            poBranch = new ParamModels(poGRider).Branch();
+        }
+
         if (!"".equals((String) getValue("sBranchCd"))) {
             if (poBranch.getEditMode() == EditMode.READY
                     && poBranch.getBranchCode().equals((String) getValue("sBranchCd"))) {
                 return poBranch;
             } else {
+                if (ReferenceCache.tryLoad("Branch", (String) getValue("sBranchCd"), poBranch)) {
+                    return poBranch;
+                }
+
                 poJSON = poBranch.openRecord((String) getValue("sBranchCd"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Branch", (String) getValue("sBranchCd"), poBranch);
                     return poBranch;
                 } else {
                     poBranch.initialize();
@@ -462,14 +453,23 @@ public class Model_PO_Quotation_Master extends Model {
     }
 
     public Model_Industry Industry() throws SQLException, GuanzonException {
+        if (poIndustry == null) {
+            poIndustry = new ParamModels(poGRider).Industry();
+        }
+
         if (!"".equals((String) getValue("sIndstCdx"))) {
             if (poIndustry.getEditMode() == EditMode.READY
                     && poIndustry.getIndustryId().equals((String) getValue("sIndstCdx"))) {
                 return poIndustry;
             } else {
+                if (ReferenceCache.tryLoad("Industry", (String) getValue("sIndstCdx"), poIndustry)) {
+                    return poIndustry;
+                }
+
                 poJSON = poIndustry.openRecord((String) getValue("sIndstCdx"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Industry", (String) getValue("sIndstCdx"), poIndustry);
                     return poIndustry;
                 } else {
                     poIndustry.initialize();
@@ -483,14 +483,23 @@ public class Model_PO_Quotation_Master extends Model {
     }
 
     public Model_Company Company() throws SQLException, GuanzonException {
+        if (poCompany == null) {
+            poCompany = new ParamModels(poGRider).Company();
+        }
+
         if (!"".equals((String) getValue("sCompnyID"))) {
             if (poCompany.getEditMode() == EditMode.READY
                     && poCompany.getCompanyId().equals((String) getValue("sCompnyID"))) {
                 return poCompany;
             } else {
+                if (ReferenceCache.tryLoad("Company", (String) getValue("sCompnyID"), poCompany)) {
+                    return poCompany;
+                }
+
                 poJSON = poCompany.openRecord((String) getValue("sCompnyID"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Company", (String) getValue("sCompnyID"), poCompany);
                     return poCompany;
                 } else {
                     poCompany.initialize();
@@ -502,16 +511,25 @@ public class Model_PO_Quotation_Master extends Model {
             return poCompany;
         }
     }
-    
+
     public Model_Client_Master Supplier() throws SQLException, GuanzonException {
+        if (poSupplier == null) {
+            poSupplier = new ClientModels(poGRider).ClientMaster();
+        }
+
         if (!"".equals((String) getValue("sSupplier"))) {
             if (poSupplier.getEditMode() == EditMode.READY
                     && poSupplier.getClientId().equals((String) getValue("sSupplier"))) {
                 return poSupplier;
             } else {
+                if (ReferenceCache.tryLoad("Client_Master", (String) getValue("sSupplier"), poSupplier)) {
+                    return poSupplier;
+                }
+
                 poJSON = poSupplier.openRecord((String) getValue("sSupplier"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Client_Master", (String) getValue("sSupplier"), poSupplier);
                     return poSupplier;
                 } else {
                     poSupplier.initialize();
@@ -523,16 +541,25 @@ public class Model_PO_Quotation_Master extends Model {
             return poSupplier;
         }
     }
-    
+
     public Model_Client_Address Address() throws SQLException, GuanzonException {
+        if (poSupplierAddress == null) {
+            poSupplierAddress = new ClientModels(poGRider).ClientAddress();
+        }
+
         if (!"".equals((String) getValue("sSupplier"))) {
             if (poSupplierAddress.getEditMode() == EditMode.READY
                     && poSupplierAddress.getClientId().equals((String) getValue("sSupplier"))) {
                 return poSupplierAddress;
             } else {
+                if (ReferenceCache.tryLoad("Client_Address", (String) getValue("sSupplier"), poSupplierAddress)) {
+                    return poSupplierAddress;
+                }
+
                 poJSON = poSupplierAddress.openRecord((String) getValue("sSupplier")); //sAddrssID
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Client_Address", (String) getValue("sSupplier"), poSupplierAddress);
                     return poSupplierAddress;
                 } else {
                     poSupplierAddress.initialize();
@@ -544,16 +571,25 @@ public class Model_PO_Quotation_Master extends Model {
             return poSupplierAddress;
         }
     }
-    
+
     public Model_Client_Mobile Contact() throws SQLException, GuanzonException {
+        if (poSupplierMobile == null) {
+            poSupplierMobile = new ClientModels(poGRider).ClientMobile();
+        }
+
         if (!"".equals((String) getValue("sContctID"))) {
             if (poSupplierMobile.getEditMode() == EditMode.READY
                     && poSupplierMobile.getClientId().equals((String) getValue("sContctID"))) {
                 return poSupplierMobile;
             } else {
+                if (ReferenceCache.tryLoad("Client_Mobile", (String) getValue("sContctID"), poSupplierMobile)) {
+                    return poSupplierMobile;
+                }
+
                 poJSON = poSupplierMobile.openRecord((String) getValue("sContctID"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Client_Mobile", (String) getValue("sContctID"), poSupplierMobile);
                     return poSupplierMobile;
                 } else {
                     poSupplierMobile.initialize();
@@ -565,16 +601,25 @@ public class Model_PO_Quotation_Master extends Model {
             return poSupplierMobile;
         }
     }
-    
+
     public Model_Term Term() throws SQLException, GuanzonException {
+        if (poTerm == null) {
+            poTerm = new ParamModels(poGRider).Term();
+        }
+
         if (!"".equals((String) getValue("sTermCode"))) {
             if (poTerm.getEditMode() == EditMode.READY
                     && poTerm.getTermId().equals((String) getValue("sTermCode"))) {
                 return poTerm;
             } else {
+                if (ReferenceCache.tryLoad("Term", (String) getValue("sTermCode"), poTerm)) {
+                    return poTerm;
+                }
+
                 poJSON = poTerm.openRecord((String) getValue("sTermCode"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
+                    ReferenceCache.store("Term", (String) getValue("sTermCode"), poTerm);
                     return poTerm;
                 } else {
                     poTerm.initialize();
@@ -586,8 +631,12 @@ public class Model_PO_Quotation_Master extends Model {
             return poTerm;
         }
     }
-    
+
     public Model_PO_Quotation_Request_Master POQuotationRequest() throws SQLException, GuanzonException {
+        if (poQuotationRequest == null) {
+            poQuotationRequest = new QuotationModels(poGRider).POQuotationRequestMaster();
+        }
+
         if (!"".equals((String) getValue("sSourceNo"))) {
             if (poQuotationRequest.getEditMode() == EditMode.READY
                     && poQuotationRequest.getIndustryId().equals((String) getValue("sSourceNo"))) {

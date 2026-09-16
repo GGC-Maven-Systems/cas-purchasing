@@ -18,6 +18,9 @@ import org.json.simple.JSONObject;
  */
 public class Model_PO_Cancellation_Detail extends Model {
 
+    //poPurchaseOrder/poInventory/poInventoryMaster are intentionally NOT constructed in
+    //initialize() - see their accessors below, which build them lazily on first access so
+    //opening this record never touches those tables.
     Model_PO_Detail poPurchaseOrder;
     Model_Inventory poInventory;
     Model_Inv_Master poInventoryMaster;
@@ -45,10 +48,6 @@ public class Model_PO_Cancellation_Detail extends Model {
 
             ID = poEntity.getMetaData().getColumnLabel(1);
             ID2 = poEntity.getMetaData().getColumnLabel(2);
-
-            poPurchaseOrder = new PurchaseOrderModels(poGRider).PurchaseOrderDetails();
-            poInventory = new InvModels(poGRider).Inventory();
-            poInventoryMaster = new InvModels(poGRider).InventoryMaster();
 
             pnEditMode = EditMode.UNKNOWN;
         } catch (SQLException e) {
@@ -134,6 +133,10 @@ public class Model_PO_Cancellation_Detail extends Model {
     }
 
     public Model_Inventory Inventory() throws GuanzonException, SQLException {
+        if (poInventory == null) {
+            poInventory = new InvModels(poGRider).Inventory();
+        }
+
         if (!"".equals((String) getValue("sStockIDx"))) {
             if (poInventory.getEditMode() == EditMode.READY
                     && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
@@ -156,6 +159,10 @@ public class Model_PO_Cancellation_Detail extends Model {
     }
 
     public Model_Inv_Master InventoryMaster() throws GuanzonException, SQLException {
+        if (poInventoryMaster == null) {
+            poInventoryMaster = new InvModels(poGRider).InventoryMaster();
+        }
+
         if (!"".equals((String) getValue("sStockIDx"))) {
             if (poInventoryMaster.getEditMode() == EditMode.READY
                     && poInventoryMaster.getStockId().equals((String) getValue("sStockIDx"))) {
@@ -177,6 +184,10 @@ public class Model_PO_Cancellation_Detail extends Model {
     }
 
     public Model_PO_Detail PurchaseOrderDetail() throws SQLException, GuanzonException {
+        if (poPurchaseOrder == null) {
+            poPurchaseOrder = new PurchaseOrderModels(poGRider).PurchaseOrderDetails();
+        }
+
         if (!"".equals(getValue("sOrderNox")) && !"".equals(getValue("sStockIDx"))) {
             if (this.poPurchaseOrder.getEditMode() == 1 && this.poPurchaseOrder
                     .getTransactionNo().equals(getValue("sOrderNox"))

@@ -415,7 +415,7 @@ public class PurchaseOrderReceiving_General implements GValidator{
                 String lsAuthCod2 = poMatrix.getAuthType("PURCHASE ORDER MATRIX", String.valueOf(lnPTotlAmt), "");
 
                 //If authcode of purchase order is different from supposedly authcode of purchase delivery then create authcode
-                if(lsAuthCod1.equalsIgnoreCase(lsAuthCod2)){
+                if(!lsAuthCod1.equalsIgnoreCase(lsAuthCod2)){
                     lsRemarks = poMaster.getBranchCode()  
                         + "/" + poMaster.getTransactionNo() 
                         + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
@@ -427,8 +427,6 @@ public class PurchaseOrderReceiving_General implements GValidator{
             }
         }
         
-        //mac 2026.04.23
-        // disable ko muna ito, test muna
         if(poMatrix.hasAuthRequest()){
             try {
                 poJSON = poMatrix.processAuth();
