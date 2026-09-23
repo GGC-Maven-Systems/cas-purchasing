@@ -191,20 +191,22 @@ public class Model_PO_Quotation_Request_Supplier extends Model {
         if (poCompany == null) {
             poCompany = new ParamModels(poGRider).Company();
         }
+        
+        String id = (String) (getValue("sCompnyID") == null ? "" : getValue("sCompnyID"));
 
-        if (!"".equals((String) getValue("sCompnyID"))) {
+        if (!"".equals(id)) {
             if (poCompany.getEditMode() == EditMode.READY
-                    && poCompany.getCompanyId().equals((String) getValue("sCompnyID"))) {
+                    && poCompany.getCompanyId().equals(id)) {
                 return poCompany;
             } else {
-                if (ReferenceCache.tryLoad("Company", (String) getValue("sCompnyID"), poCompany)) {
+                if (ReferenceCache.tryLoad("Company", id, poCompany)) {
                     return poCompany;
                 }
 
-                poJSON = poCompany.openRecord((String) getValue("sCompnyID"));
+                poJSON = poCompany.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Company", (String) getValue("sCompnyID"), poCompany);
+                    ReferenceCache.store("Company", id, poCompany);
                     return poCompany;
                 } else {
                     poCompany.initialize();
@@ -242,20 +244,22 @@ public class Model_PO_Quotation_Request_Supplier extends Model {
         if (poTerm == null) {
             poTerm = new ParamModels(poGRider).Term();
         }
+        
+        String id = (String) (getValue("sTermCode") == null ? "" : getValue("sTermCode"));
 
-        if (!"".equals((String) getValue("sTermCode"))) {
+        if (!"".equals(id)) {
             if (poTerm.getEditMode() == EditMode.READY
-                    && poTerm.getTermId().equals((String) getValue("sTermCode"))) {
+                    && poTerm.getTermId().equals(id)) {
                 return poTerm;
             } else {
-                if (ReferenceCache.tryLoad("Term", (String) getValue("sTermCode"), poTerm)) {
+                if (ReferenceCache.tryLoad("Term", id, poTerm)) {
                     return poTerm;
                 }
 
-                poJSON = poTerm.openRecord((String) getValue("sTermCode"));
+                poJSON = poTerm.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Term", (String) getValue("sTermCode"), poTerm);
+                    ReferenceCache.store("Term", id, poTerm);
                     return poTerm;
                 } else {
                     poTerm.initialize();
@@ -272,20 +276,22 @@ public class Model_PO_Quotation_Request_Supplier extends Model {
         if (poSupplier == null) {
             poSupplier = new ClientModels(poGRider).ClientMaster();
         }
+        
+        String id = (String) (getValue("sSupplier") == null ? "" : getValue("sSupplier"));
 
-        if (!"".equals((String) getValue("sSupplier"))) {
+        if (!"".equals(id)) {
             if (poSupplier.getEditMode() == EditMode.READY
-                    && poSupplier.getClientId().equals((String) getValue("sSupplier"))) {
+                    && poSupplier.getClientId().equals(id)) {
                 return poSupplier;
             } else {
-                if (ReferenceCache.tryLoad("Client_Master", (String) getValue("sSupplier"), poSupplier)) {
+                if (ReferenceCache.tryLoad("Client_Master", id, poSupplier)) {
                     return poSupplier;
                 }
 
-                poJSON = poSupplier.openRecord((String) getValue("sSupplier"));
+                poJSON = poSupplier.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Client_Master", (String) getValue("sSupplier"), poSupplier);
+                    ReferenceCache.store("Client_Master", id, poSupplier);
                     return poSupplier;
                 } else {
                     poSupplier.initialize();
@@ -303,19 +309,21 @@ public class Model_PO_Quotation_Request_Supplier extends Model {
             poSupplierAddress = new ClientModels(poGRider).ClientAddress();
         }
 
-        if (!"".equals((String) getValue("sSupplier"))) {
+        String id = (String) (getValue("sSupplier") == null ? "" : getValue("sSupplier"));
+        
+        if (!"".equals(id)) {
             if (poSupplierAddress.getEditMode() == EditMode.READY
-                    && poSupplierAddress.getClientId().equals((String) getValue("sSupplier"))) {
+                    && poSupplierAddress.getClientId().equals(id)) {
                 return poSupplierAddress;
             } else {
-                if (ReferenceCache.tryLoad("Client_Address", (String) getValue("sSupplier"), poSupplierAddress)) {
+                if (ReferenceCache.tryLoad("Client_Address", id, poSupplierAddress)) {
                     return poSupplierAddress;
                 }
 
-                poJSON = poSupplierAddress.openRecord((String) getValue("sSupplier")); //sAddrssID
+                poJSON = poSupplierAddress.openRecord(id); //sAddrssID
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Client_Address", (String) getValue("sSupplier"), poSupplierAddress);
+                    ReferenceCache.store("Client_Address", id, poSupplierAddress);
                     return poSupplierAddress;
                 } else {
                     poSupplierAddress.initialize();
@@ -332,20 +340,22 @@ public class Model_PO_Quotation_Request_Supplier extends Model {
         if (poSupplierMobile == null) {
             poSupplierMobile = new ClientModels(poGRider).ClientMobile();
         }
+        
+        String id = (String) (getValue("sContctID") == null ? "" : getValue("sContctID"));
 
-        if (!"".equals((String) getValue("sContctID"))) {
+        if (!"".equals(id)) {
             if (poSupplierMobile.getEditMode() == EditMode.READY
-                    && poSupplierMobile.getClientId().equals((String) getValue("sContctID"))) {
+                    && poSupplierMobile.getClientId().equals(id)) {
                 return poSupplierMobile;
             } else {
-                if (ReferenceCache.tryLoad("Client_Mobile", (String) getValue("sContctID"), poSupplierMobile)) {
+                if (ReferenceCache.tryLoad("Client_Mobile", id, poSupplierMobile)) {
                     return poSupplierMobile;
                 }
 
-                poJSON = poSupplierMobile.openRecord((String) getValue("sContctID"));
+                poJSON = poSupplierMobile.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Client_Mobile", (String) getValue("sContctID"), poSupplierMobile);
+                    ReferenceCache.store("Client_Mobile", id, poSupplierMobile);
                     return poSupplierMobile;
                 } else {
                     poSupplierMobile.initialize();
@@ -362,13 +372,15 @@ public class Model_PO_Quotation_Request_Supplier extends Model {
         if (poPOQuotationRequest == null) {
             poPOQuotationRequest = new QuotationModels(poGRider).POQuotationRequestMaster();
         }
+        
+        String id = (String) (getValue("sTransNox") == null ? "" : getValue("sTransNox"));
 
-        if (!"".equals((String) getValue("sTransNox"))) {
+        if (!"".equals(id)) {
             if (poPOQuotationRequest.getEditMode() == EditMode.READY
-                    && poPOQuotationRequest.getTransactionNo().equals((String) getValue("sTransNox"))) {
+                    && poPOQuotationRequest.getTransactionNo().equals(id)) {
                 return poPOQuotationRequest;
             } else {
-                poJSON = poPOQuotationRequest.openRecord((String) getValue("sTransNox"));
+                poJSON = poPOQuotationRequest.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poPOQuotationRequest;

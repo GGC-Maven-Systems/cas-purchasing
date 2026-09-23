@@ -120,10 +120,18 @@ public class Model_POR_Serial extends Model {
     }
     
     public JSONObject setSerial01(String serialNumber) {
+        if (poInvSerial == null) {
+            poInvSerial = new InvModels(poGRider).InventorySerial();
+        }
+        
         return poInvSerial.setSerial01(serialNumber);
     }
 
     public String getSerial01() {
+        if (poInvSerial == null) {
+            poInvSerial = new InvModels(poGRider).InventorySerial();
+        }
+        
         if(poInvSerial.getSerial01() == null){
             return "";
         }
@@ -132,21 +140,38 @@ public class Model_POR_Serial extends Model {
     }
 
     public JSONObject setSerial02(String serialNumber) {
+        if (poInvSerial == null) {
+            poInvSerial = new InvModels(poGRider).InventorySerial();
+        }
+        
         return poInvSerial.setSerial02(serialNumber);
     }
 
     public String getSerial02() {
+        if (poInvSerial == null) {
+            poInvSerial = new InvModels(poGRider).InventorySerial();
+        }
+        
         if(poInvSerial.getSerial02() == null){
             return "";
         }
+        
         return poInvSerial.getSerial02();
     }
 
     public JSONObject setConductionStickerNo(String conductionStickerNo) {
+        if (poInvSerialRegistration == null) {
+            poInvSerialRegistration = new InvModels(poGRider).InventorySerialRegistration();
+        }
+        
         return poInvSerialRegistration.setConductionStickerNo(conductionStickerNo);
     }
 
     public String getConductionStickerNo() {
+        if (poInvSerialRegistration == null) {
+            poInvSerialRegistration = new InvModels(poGRider).InventorySerialRegistration();
+        }
+        
         if(poInvSerialRegistration.getConductionStickerNo() == null){
             return "";
         } 
@@ -156,13 +181,22 @@ public class Model_POR_Serial extends Model {
     }
 
     public JSONObject setPlateNo(String plateNo) {
+        if (poInvSerialRegistration == null) {
+            poInvSerialRegistration = new InvModels(poGRider).InventorySerialRegistration();
+        }
+        
         return poInvSerialRegistration.setPlateNoP(plateNo);
     }
 
     public String getPlateNo() {
+        if (poInvSerialRegistration == null) {
+            poInvSerialRegistration = new InvModels(poGRider).InventorySerialRegistration();
+        }
+        
         if(poInvSerialRegistration.getPlateNoP() == null){
             return "";
         } 
+        
         return poInvSerialRegistration.getPlateNoP();
     }
     
@@ -177,13 +211,15 @@ public class Model_POR_Serial extends Model {
         if (poInventory == null) {
             poInventory = new InvModels(poGRider).Inventory();
         }
+        
+        String id = (String) (getValue("sStockIDx") == null ? "" : getValue("sStockIDx"));
 
-        if (!"".equals((String) getValue("sStockIDx"))) {
+        if (!"".equals(id)) {
             if (poInventory.getEditMode() == EditMode.READY
-                    && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
+                    && poInventory.getStockId().equals(id)) {
                 return poInventory;
             } else {
-                poJSON = poInventory.openRecord((String) getValue("sStockIDx"));
+                poJSON = poInventory.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInventory;
@@ -203,19 +239,21 @@ public class Model_POR_Serial extends Model {
             poLocation = new ParamModels(poGRider).InventoryLocation();
         }
 
-        if (!"".equals((String) getValue("sLocatnID"))) {
+        String id = (String) (getValue("sLocatnID") == null ? "" : getValue("sLocatnID"));
+        
+        if (!"".equals(id)) {
             if (poLocation.getEditMode() == EditMode.READY
-                    && poLocation.getLocationId().equals((String) getValue("sLocatnID"))) {
+                    && poLocation.getLocationId().equals(id)) {
                 return poLocation;
             } else {
-                if (ReferenceCache.tryLoad("Inv_Location", (String) getValue("sLocatnID"), poLocation)) {
+                if (ReferenceCache.tryLoad("Inv_Location", id, poLocation)) {
                     return poLocation;
                 }
 
-                poJSON = poLocation.openRecord((String) getValue("sLocatnID"));
+                poJSON = poLocation.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Inv_Location", (String) getValue("sLocatnID"), poLocation);
+                    ReferenceCache.store("Inv_Location", id, poLocation);
                     return poLocation;
                 } else {
                     poLocation.initialize();
@@ -233,14 +271,16 @@ public class Model_POR_Serial extends Model {
             poInvSerial = new InvModels(poGRider).InventorySerial();
         }
 
-        if (!"".equals((String) getValue("sSerialID"))) {
+        String id = (String) (getValue("sSerialID") == null ? "" : getValue("sSerialID"));
+        
+        if (!"".equals(id)) {
             if (poInvSerial.getEditMode() == EditMode.READY
-                    && poInvSerial.getStockId().equals((String) getValue("sSerialID"))) {
+                    && poInvSerial.getStockId().equals(id)) {
                 return poInvSerial;
             } else {
-                poJSON = poInvSerial.openRecord((String) getValue("sSerialID"));
+                poJSON = poInvSerial.openRecord(id);
 
-                if ("success".equals((String) poJSON.get("result"))) {
+                if ("success".equals(id)) {
                     return poInvSerial;
                 } else {
                     poInvSerial.initialize();
@@ -257,13 +297,15 @@ public class Model_POR_Serial extends Model {
         if (poInvSerialRegistration == null) {
             poInvSerialRegistration = new InvModels(poGRider).InventorySerialRegistration();
         }
+        
+        String id = (String) (getValue("sSerialID") == null ? "" : getValue("sSerialID"));
 
-        if (!"".equals((String) getValue("sSerialID"))) {
+        if (!"".equals(id)) {
             if (poInvSerialRegistration.getEditMode() == EditMode.READY
-                    && poInvSerialRegistration.getSerialId().equals((String) getValue("sSerialID"))) {
+                    && poInvSerialRegistration.getSerialId().equals(id)) {
                 return poInvSerialRegistration;
             } else {
-                poJSON = poInvSerialRegistration.openRecord((String) getValue("sSerialID"));
+                poJSON = poInvSerialRegistration.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInvSerialRegistration;
@@ -283,12 +325,14 @@ public class Model_POR_Serial extends Model {
             poInvSerialLedger = new InvModels(poGRider).InventorySerialLedger();
         }
 
-        if (!"".equals((String) getValue("sSerialID"))) {
+        String id = (String) (getValue("sSerialID") == null ? "" : getValue("sSerialID"));
+        
+        if (!"".equals(id)) {
             if (poInvSerialLedger.getEditMode() == EditMode.READY
-                    && poInvSerialLedger.getSerialId().equals((String) getValue("sSerialID"))) {
+                    && poInvSerialLedger.getSerialId().equals(id)) {
                 return poInvSerialLedger;
             } else {
-                poJSON = poInvSerialLedger.openRecord((String) getValue("sSerialID"));
+                poJSON = poInvSerialLedger.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInvSerialLedger;

@@ -136,14 +136,16 @@ public class Model_PO_Cancellation_Detail extends Model {
         if (poInventory == null) {
             poInventory = new InvModels(poGRider).Inventory();
         }
+        
+        String id = (String) (getValue("sStockIDx") == null ? "" : getValue("sStockIDx"));
 
-        if (!"".equals((String) getValue("sStockIDx"))) {
+        if (!"".equals(id)) {
             if (poInventory.getEditMode() == EditMode.READY
-                    && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
+                    && poInventory.getStockId().equals(id)) {
                 return poInventory;
             } else {
 
-                poJSON = poInventory.openRecord((String) getValue("sStockIDx"));
+                poJSON = poInventory.openRecord(id);
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInventory;
                 } else {
@@ -162,13 +164,15 @@ public class Model_PO_Cancellation_Detail extends Model {
         if (poInventoryMaster == null) {
             poInventoryMaster = new InvModels(poGRider).InventoryMaster();
         }
+        
+        String id = (String) (getValue("sStockIDx") == null ? "" : getValue("sStockIDx"));
 
-        if (!"".equals((String) getValue("sStockIDx"))) {
+        if (!"".equals(id)) {
             if (poInventoryMaster.getEditMode() == EditMode.READY
-                    && poInventoryMaster.getStockId().equals((String) getValue("sStockIDx"))) {
+                    && poInventoryMaster.getStockId().equals(id)) {
                 return poInventoryMaster;
             } else {
-                poJSON = poInventoryMaster.openRecord((String) getValue("sStockIDx"), poGRider.getBranchCode());
+                poJSON = poInventoryMaster.openRecord(id, poGRider.getBranchCode());
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInventoryMaster;
@@ -187,7 +191,7 @@ public class Model_PO_Cancellation_Detail extends Model {
         if (poPurchaseOrder == null) {
             poPurchaseOrder = new PurchaseOrderModels(poGRider).PurchaseOrderDetails();
         }
-
+        
         if (!"".equals(getValue("sOrderNox")) && !"".equals(getValue("sStockIDx"))) {
             if (this.poPurchaseOrder.getEditMode() == 1 && this.poPurchaseOrder
                     .getTransactionNo().equals(getValue("sOrderNox"))

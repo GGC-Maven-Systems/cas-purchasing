@@ -244,12 +244,14 @@ public class Model_PO_Quotation_Request_Detail extends Model {
             poInventory = new InvModels(poGRider).Inventory();
         }
 
-        if (!"".equals((String) getValue("sStockIDx"))) {
+        String id = (String) (getValue("sStockIDx") == null ? "" : getValue("sStockIDx"));
+        
+        if (!"".equals(id)) {
             if (poInventory.getEditMode() == EditMode.READY
-                    && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
+                    && poInventory.getStockId().equals(id)) {
                 return poInventory;
             } else {
-                poJSON = poInventory.openRecord((String) getValue("sStockIDx"));
+                poJSON = poInventory.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInventory;

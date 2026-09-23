@@ -241,20 +241,22 @@ public class Model_PO_Quotation_Request_Master extends Model {
         if (poBranch == null) {
             poBranch = new ParamModels(poGRider).Branch();
         }
+        
+        String id = (String) (getValue("sBranchCd") == null ? "" : getValue("sBranchCd"));
 
-        if (!"".equals((String) getValue("sBranchCd"))) {
+        if (!"".equals(id)) {
             if (poBranch.getEditMode() == EditMode.READY
-                    && poBranch.getBranchCode().equals((String) getValue("sBranchCd"))) {
+                    && poBranch.getBranchCode().equals(id)) {
                 return poBranch;
             } else {
-                if (ReferenceCache.tryLoad("Branch", (String) getValue("sBranchCd"), poBranch)) {
+                if (ReferenceCache.tryLoad("Branch", id, poBranch)) {
                     return poBranch;
                 }
 
-                poJSON = poBranch.openRecord((String) getValue("sBranchCd"));
+                poJSON = poBranch.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Branch", (String) getValue("sBranchCd"), poBranch);
+                    ReferenceCache.store("Branch", id, poBranch);
                     return poBranch;
                 } else {
                     poBranch.initialize();
@@ -271,20 +273,22 @@ public class Model_PO_Quotation_Request_Master extends Model {
         if (poDestination == null) {
             poDestination = new ParamModels(poGRider).Branch();
         }
+        
+        String id = (String) (getValue("sDestinat") == null ? "" : getValue("sDestinat"));
 
-        if (!"".equals((String) getValue("sDestinat"))) {
+        if (!"".equals(id)) {
             if (poDestination.getEditMode() == EditMode.READY
-                    && poDestination.getBranchCode().equals((String) getValue("sDestinat"))) {
+                    && poDestination.getBranchCode().equals(id)) {
                 return poDestination;
             } else {
-                if (ReferenceCache.tryLoad("Branch", (String) getValue("sDestinat"), poDestination)) {
+                if (ReferenceCache.tryLoad("Branch", id, poDestination)) {
                     return poDestination;
                 }
 
-                poJSON = poDestination.openRecord((String) getValue("sDestinat"));
+                poJSON = poDestination.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Branch", (String) getValue("sDestinat"), poDestination);
+                    ReferenceCache.store("Branch", id, poDestination);
                     return poDestination;
                 } else {
                     poDestination.initialize();
@@ -301,20 +305,22 @@ public class Model_PO_Quotation_Request_Master extends Model {
         if (poIndustry == null) {
             poIndustry = new ParamModels(poGRider).Industry();
         }
+        
+        String id = (String) (getValue("sIndstCdx") == null ? "" : getValue("sIndstCdx"));
 
-        if (!"".equals((String) getValue("sIndstCdx"))) {
+        if (!"".equals(id)) {
             if (poIndustry.getEditMode() == EditMode.READY
-                    && poIndustry.getIndustryId().equals((String) getValue("sIndstCdx"))) {
+                    && poIndustry.getIndustryId().equals(id)) {
                 return poIndustry;
             } else {
-                if (ReferenceCache.tryLoad("Industry", (String) getValue("sIndstCdx"), poIndustry)) {
+                if (ReferenceCache.tryLoad("Industry", id, poIndustry)) {
                     return poIndustry;
                 }
 
-                poJSON = poIndustry.openRecord((String) getValue("sIndstCdx"));
+                poJSON = poIndustry.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Industry", (String) getValue("sIndstCdx"), poIndustry);
+                    ReferenceCache.store("Industry", id, poIndustry);
                     return poIndustry;
                 } else {
                     poIndustry.initialize();
@@ -331,20 +337,22 @@ public class Model_PO_Quotation_Request_Master extends Model {
         if (poCategory == null) {
             poCategory = new ParamModels(poGRider).Category();
         }
+        
+        String id = (String) (getValue("sCategrCd") == null ? "" : getValue("sCategrCd"));
 
-        if (!"".equals((String) getValue("sCategrCd"))) {
+        if (!"".equals(id)) {
             if (poCategory.getEditMode() == EditMode.READY
-                    && poCategory.getCategoryId().equals((String) getValue("sCategrCd"))) {
+                    && poCategory.getCategoryId().equals(id)) {
                 return poCategory;
             } else {
-                if (ReferenceCache.tryLoad("Category", (String) getValue("sCategrCd"), poCategory)) {
+                if (ReferenceCache.tryLoad("Category", id, poCategory)) {
                     return poCategory;
                 }
 
-                poJSON = poCategory.openRecord((String) getValue("sCategrCd"));
+                poJSON = poCategory.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Category", (String) getValue("sCategrCd"), poCategory);
+                    ReferenceCache.store("Category", id, poCategory);
                     return poCategory;
                 } else {
                     poCategory.initialize();
@@ -361,20 +369,22 @@ public class Model_PO_Quotation_Request_Master extends Model {
         if (poCategory2 == null) {
             poCategory2 = new ParamModels(poGRider).Category2();
         }
+        
+        String id = (String) (getValue("sCategCd2") == null ? "" : getValue("sCategCd2"));
 
-        if (!"".equals((String) getValue("sCategCd2"))) {
+        if (!"".equals(id)) {
             if (poCategory2.getEditMode() == EditMode.READY
-                    && poCategory2.getCategoryId().equals((String) getValue("sCategCd2"))) {
+                    && poCategory2.getCategoryId().equals(id)) {
                 return poCategory2;
             } else {
-                if (ReferenceCache.tryLoad("Category_Level2", (String) getValue("sCategCd2"), poCategory2)) {
+                if (ReferenceCache.tryLoad("Category_Level2", id, poCategory2)) {
                     return poCategory2;
                 }
 
-                poJSON = poCategory2.openRecord((String) getValue("sCategCd2"));
+                poJSON = poCategory2.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Category_Level2", (String) getValue("sCategCd2"), poCategory2);
+                    ReferenceCache.store("Category_Level2", id, poCategory2);
                     return poCategory2;
                 } else {
                     poCategory2.initialize();
@@ -392,19 +402,21 @@ public class Model_PO_Quotation_Request_Master extends Model {
             poDepartment = new ParamModels(poGRider).Department();
         }
 
-        if (!"".equals((String) getValue("sDeptIDxx"))) {
+        String id = (String) (getValue("sDeptIDxx") == null ? "" : getValue("sDeptIDxx"));
+        
+        if (!"".equals(id)) {
             if (poDepartment.getEditMode() == EditMode.READY
-                    && poDepartment.getDepartmentId().equals((String) getValue("sDeptIDxx"))) {
+                    && poDepartment.getDepartmentId().equals(id)) {
                 return poDepartment;
             } else {
-                if (ReferenceCache.tryLoad("Department", (String) getValue("sDeptIDxx"), poDepartment)) {
+                if (ReferenceCache.tryLoad("Department", id, poDepartment)) {
                     return poDepartment;
                 }
 
-                poJSON = poDepartment.openRecord((String) getValue("sDeptIDxx"));
+                poJSON = poDepartment.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Department", (String) getValue("sDeptIDxx"), poDepartment);
+                    ReferenceCache.store("Department", id, poDepartment);
                     return poDepartment;
                 } else {
                     poDepartment.initialize();

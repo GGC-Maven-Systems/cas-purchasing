@@ -213,7 +213,7 @@ public class Model_PO_Quotation_Detail extends Model {
         if (poBrand == null) {
             poBrand = new ParamModels(poGRider).Brand();
         }
-
+        
         if (!"".equals((String) getValue("sStockIDx")) && (String) getValue("sStockIDx") != null) {
             psBrandId = Inventory().getBrandId();
             setBrandId(Inventory().getBrandId());
@@ -282,12 +282,14 @@ public class Model_PO_Quotation_Detail extends Model {
             poInventory = new InvModels(poGRider).Inventory();
         }
 
-        if (!"".equals((String) getValue("sStockIDx"))) {
+        String id = (String) (getValue("sStockIDx") == null ? "" : getValue("sStockIDx"));
+        
+        if (!"".equals(id)) {
             if (poInventory.getEditMode() == EditMode.READY
-                    && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
+                    && poInventory.getStockId().equals(id)) {
                 return poInventory;
             } else {
-                poJSON = poInventory.openRecord((String) getValue("sStockIDx"));
+                poJSON = poInventory.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInventory;
@@ -307,12 +309,14 @@ public class Model_PO_Quotation_Detail extends Model {
             poReplaced = new InvModels(poGRider).Inventory();
         }
 
-        if (!"".equals((String) getValue("sReplacID"))) {
+        String id = (String) (getValue("sReplacID") == null ? "" : getValue("sReplacID"));
+        
+        if (!"".equals(id)) {
             if (poReplaced.getEditMode() == EditMode.READY
-                    && poReplaced.getStockId().equals((String) getValue("sReplacID"))) {
+                    && poReplaced.getStockId().equals(id)) {
                 return poReplaced;
             } else {
-                poJSON = poReplaced.openRecord((String) getValue("sReplacID"));
+                poJSON = poReplaced.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poReplaced;
