@@ -275,12 +275,14 @@ public class Model_POR_Detail extends Model{
             poInventory = new InvModels(poGRider).Inventory();
         }
 
-        if (!"".equals((String) getValue("sStockIDx"))) {
+        String id = (String) (getValue("sStockIDx") == null ? "" : getValue("sStockIDx"));
+        
+        if (!"".equals(id)) {
             if (poInventory.getEditMode() == EditMode.READY
-                    && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
+                    && poInventory.getStockId().equals(id)) {
                 return poInventory;
             } else {
-                poJSON = poInventory.openRecord((String) getValue("sStockIDx"));
+                poJSON = poInventory.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInventory;
@@ -300,12 +302,14 @@ public class Model_POR_Detail extends Model{
             poInventory = new InvModels(poGRider).Inventory();
         }
 
-        if (!"".equals((String) getValue("sReplacID"))) {
+        String id = (String) (getValue("sReplacID") == null ? "" : getValue("sReplacID"));
+        
+        if (!"".equals(id)) {
             if (poInventory.getEditMode() == EditMode.READY
-                    && poInventory.getStockId().equals((String) getValue("sReplacID"))) {
+                    && poInventory.getStockId().equals(id)) {
                 return poInventory;
             } else {
-                poJSON = poInventory.openRecord((String) getValue("sReplacID"));
+                poJSON = poInventory.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInventory;
@@ -328,19 +332,21 @@ public class Model_POR_Detail extends Model{
         if (!"".equals((String) getValue("sStockIDx")) && (String) getValue("sStockIDx") != null) {
             setBrandId(Inventory().getBrandId());
         }
+        
+        String id = (String) (getBrandId() == null ? "" : getBrandId());
 
-        if (!"".equals(getBrandId())) {
+        if (!"".equals(id)) {
             if (poBrand.getEditMode() == EditMode.READY
-                    && poBrand.getBrandId().equals(getBrandId())) {
+                    && poBrand.getBrandId().equals(id)) {
                 return poBrand;
             } else {
-                if (ReferenceCache.tryLoad("Brand", getBrandId(), poBrand)) {
+                if (ReferenceCache.tryLoad("Brand", id, poBrand)) {
                     return poBrand;
                 }
 
-                poJSON = poBrand.openRecord(getBrandId());
+                poJSON = poBrand.openRecord(id);
                 if ("success".equals((String) poJSON.get("result"))) {
-                    ReferenceCache.store("Brand", getBrandId(), poBrand);
+                    ReferenceCache.store("Brand", id, poBrand);
                     return poBrand;
                 } else {
                     poBrand.initialize();
@@ -357,13 +363,15 @@ public class Model_POR_Detail extends Model{
             if (poPurchaseOrder == null) {
                 poPurchaseOrder = new PurchaseOrderModels(poGRider).PurchaseOrderMaster();
             }
+            
+            String id = (String) (getValue("sOrderNox") == null ? "" : getValue("sOrderNox"));
 
-            if (!"".equals((String) getValue("sOrderNox"))) {
+            if (!"".equals(id)) {
                 if (poPurchaseOrder.getEditMode() == EditMode.READY
-                        && poPurchaseOrder.getTransactionNo().equals((String) getValue("sOrderNox"))) {
+                        && poPurchaseOrder.getTransactionNo().equals(id)) {
                     return poPurchaseOrder;
                 } else {
-                    poJSON = poPurchaseOrder.openRecord((String) getValue("sOrderNox"));
+                    poJSON = poPurchaseOrder.openRecord(id);
 
                     if ("success".equals((String) poJSON.get("result"))) {
                         return poPurchaseOrder;
@@ -382,13 +390,15 @@ public class Model_POR_Detail extends Model{
         if (poPurchaseOrderReturn == null) {
             poPurchaseOrderReturn = new PurchaseOrderReturnModels(poGRider).PurchaseOrderReturnMaster();
         }
+        
+        String id = (String) (getValue("sOrderNox") == null ? "" : getValue("sOrderNox"));
 
-        if (!"".equals((String) getValue("sOrderNox"))) {
+        if (!"".equals(id)) {
             if (poPurchaseOrderReturn.getEditMode() == EditMode.READY
-                    && poPurchaseOrderReturn.getTransactionNo().equals((String) getValue("sOrderNox"))) {
+                    && poPurchaseOrderReturn.getTransactionNo().equals(id)) {
                 return poPurchaseOrderReturn;
             } else {
-                poJSON = poPurchaseOrderReturn.openRecord((String) getValue("sOrderNox"));
+                poJSON = poPurchaseOrderReturn.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poPurchaseOrderReturn;
@@ -408,13 +418,15 @@ public class Model_POR_Detail extends Model{
             poPurchaseOrderReturnDetail = new PurchaseOrderReturnModels(poGRider).PurchaseOrderReturnDetails();
         }
 
-        if (!"".equals((String) getValue("sOrderNox"))) {
+        String id = (String) (getValue("sOrderNox") == null ? "" : getValue("sOrderNox"));
+        
+        if (!"".equals(id)) {
             if (poPurchaseOrderReturnDetail.getEditMode() == EditMode.READY
-                    && poPurchaseOrderReturnDetail.getTransactionNo().equals((String) getValue("sOrderNox"))
-                    && poPurchaseOrderReturnDetail.getTransactionNo().equals((String) getValue("sStockIDx"))) {
+                    && poPurchaseOrderReturnDetail.getTransactionNo().equals(id)
+                    && poPurchaseOrderReturnDetail.getTransactionNo().equals(id)) {
                 return poPurchaseOrderReturnDetail;
             } else {
-                poJSON = poPurchaseOrderReturnDetail.openRecord((String) getValue("sOrderNox"),(String) getValue("sStockIDx"));
+                poJSON = poPurchaseOrderReturnDetail.openRecord(id,(String) getValue("sStockIDx"));
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poPurchaseOrderReturnDetail;

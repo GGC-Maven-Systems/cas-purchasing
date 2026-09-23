@@ -205,13 +205,15 @@ public class Model_POReturn_Detail extends Model{
         if (poInventory == null) {
             poInventory = new InvModels(poGRider).Inventory();
         }
+        
+        String id = (String) (getValue("sStockIDx") == null ? "" : getValue("sStockIDx"));
 
-        if (!"".equals((String) getValue("sStockIDx"))) {
+        if (!"".equals(id)) {
             if (poInventory.getEditMode() == EditMode.READY
-                    && poInventory.getStockId().equals((String) getValue("sStockIDx"))) {
+                    && poInventory.getStockId().equals(id)) {
                 return poInventory;
             } else {
-                poJSON = poInventory.openRecord((String) getValue("sStockIDx"));
+                poJSON = poInventory.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInventory;
@@ -230,13 +232,15 @@ public class Model_POReturn_Detail extends Model{
         if (poInvSerial == null) {
             poInvSerial = new InvModels(poGRider).InventorySerial();
         }
+        
+        String id = (String) (getValue("sSerialID") == null ? "" : getValue("sSerialID"));
 
-        if (!"".equals((String) getValue("sSerialID"))) {
+        if (!"".equals(id)) {
             if (poInvSerial.getEditMode() == EditMode.READY
-                    && poInvSerial.getSerialId().equals((String) getValue("sSerialID"))) {
+                    && poInvSerial.getSerialId().equals(id)) {
                 return poInvSerial;
             } else {
-                poJSON = poInvSerial.openRecord((String) getValue("sSerialID"));
+                poJSON = poInvSerial.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInvSerial;
@@ -255,13 +259,15 @@ public class Model_POReturn_Detail extends Model{
         if (poInvSerialRegistration == null) {
             poInvSerialRegistration = new InvModels(poGRider).InventorySerialRegistration();
         }
+        
+        String id = (String) (getValue("sSerialID") == null ? "" : getValue("sSerialID"));
 
-        if (!"".equals((String) getValue("sSerialID"))) {
+        if (!"".equals(id)) {
             if (poInvSerialRegistration.getEditMode() == EditMode.READY
-                    && poInvSerialRegistration.getSerialId().equals((String) getValue("sSerialID"))) {
+                    && poInvSerialRegistration.getSerialId().equals(id)) {
                 return poInvSerialRegistration;
             } else {
-                poJSON = poInvSerialRegistration.openRecord((String) getValue("sSerialID"));
+                poJSON = poInvSerialRegistration.openRecord(id);
 
                 if ("success".equals((String) poJSON.get("result"))) {
                     return poInvSerialRegistration;
@@ -280,13 +286,15 @@ public class Model_POReturn_Detail extends Model{
             if (poPurchaseOrder == null) {
                 poPurchaseOrder = new PurchaseOrderModels(poGRider).PurchaseOrderMaster();
             }
+            
+            String id = (String) (getValue("sSourceNo") == null ? "" : getValue("sSourceNo"));
 
-            if (!"".equals((String) getValue("sSourceNo"))) {
+            if (!"".equals(id)) {
                 if (poPurchaseOrder.getEditMode() == EditMode.READY
-                        && poPurchaseOrder.getTransactionNo().equals((String) getValue("sSourceNo"))) {
+                        && poPurchaseOrder.getTransactionNo().equals(id)) {
                     return poPurchaseOrder;
                 } else {
-                    poJSON = poPurchaseOrder.openRecord((String) getValue("sSourceNo"));
+                    poJSON = poPurchaseOrder.openRecord(id);
 
                     if ("success".equals((String) poJSON.get("result"))) {
                         return poPurchaseOrder;
