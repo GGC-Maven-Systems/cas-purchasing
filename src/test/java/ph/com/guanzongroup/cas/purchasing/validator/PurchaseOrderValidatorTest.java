@@ -102,13 +102,6 @@ public class PurchaseOrderValidatorTest {
     }
 
     @Test
-    public void newRules_advancePaymentNeedsRateOrAmount() throws Exception {
-        assertError("no Adv Rate and Adv Amount", validator(master().advance(0, 0).build()).commonNewRules());
-        assertOk(validator(master().advance(10, 0).build()).commonNewRules());
-        assertOk(validator(master().advance(0, 100).build()).commonNewRules());
-    }
-
-    @Test
     public void newRules_newBackdatedPurchaseOrderNeedsReference() throws Exception {
         assertError("reference number is required",
                 validator(master().addNew().transact(TODAY.minusDays(3)).reference("").build()).commonNewRules());
@@ -156,7 +149,7 @@ public class PurchaseOrderValidatorTest {
     }
 
     // =====================================================================
-    // Discounts, advance payment, totals
+    // Discounts, totals
     // =====================================================================
     @Test
     public void discountRate_needsDetailAmountAndRange() {
@@ -184,37 +177,8 @@ public class PurchaseOrderValidatorTest {
     }
 
     @Test
-    public void advance_exactCentsAreAllowed() {
-        //after discounts: 0.30 - 0.10 = 0.20; 50% = 0.10 + 0.10 fixed = 0.20
-        PurchaseOrderValidator loValidator = validator(master().tranTotal(0.30).addDiscount(0.10).advance(0, 0.10).build());
-        assertOk(loValidator.validateAdvancePaymentRate(50));
-    }
-
-    @Test
     public void discountAmount_needsAmountAfterRate() {
         assertError("no amount entered", validator(master().tranTotal(1000).discount(100).build()).validateDiscountAmount(1));
-    }
-
-    @Test
-    public void advanceRate_limits() {
-        //amount after discounts: 10000 - 10% - 1000 = 8000
-        PurchaseOrderValidator loValidator = validator(master().tranTotal(10000).discount(10).addDiscount(1000)
-                .advance(0, 2000).build());
-        assertOk(loValidator.validateAdvancePaymentRate(75));          //6000 + 2000 = 8000
-        assertError("Invalid Downpayment Total", loValidator.validateAdvancePaymentRate(76)); //6080 + 2000 > 8000
-        assertError("Must be between 0.0000 and 100.0000", loValidator.validateAdvancePaymentRate(101));
-        assertError("total transaction amount is 0.0000",
-                validator(master().tranTotal(0).build()).validateAdvancePaymentRate(10));
-    }
-
-    @Test
-    public void advanceAmount_limits() {
-        //amount after discounts: 8000; rate 50% = 4000
-        PurchaseOrderValidator loValidator = validator(master().tranTotal(10000).discount(10).addDiscount(1000)
-                .advance(50, 0).build());
-        assertOk(loValidator.validateAdvancePaymentAmount(4000));
-        assertError("Invalid Downpayment Total", loValidator.validateAdvancePaymentAmount(4000.01));
-        assertError("Invalid Advance Payment Amount", loValidator.validateAdvancePaymentAmount(8000.01));
     }
 
     @Test

@@ -18,6 +18,7 @@
             <artifactId>junit</artifactId>
             <version>4.13.1</version>
             <type>jar</type>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>javax.persistence</groupId>
@@ -104,6 +105,33 @@
         </dependency>
         
         <!-- Mockito with inline mocking: provides org.mockito.Mockito / ArgumentMatchers -->
+        <!-- Purchase Order screens (ph.com.guanzongroup.cas.purchasing.ui).
+             Optional: projects that use cas-purchasing as a library don't get
+             these through it. Same versions as integsys. -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>11</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>11</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>de.jensd</groupId>
+            <artifactId>fontawesomefx</artifactId>
+            <version>8.9</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>2.0.29</version>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-inline</artifactId>
@@ -120,6 +148,12 @@
                 <configuration>
                     <!-- Add any configuration options here -->
                 </configuration>
+            </plugin>
+            <!-- Runs the JUnit 4 tests on "mvn test" -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
             </plugin>
         </plugins>
     </build>

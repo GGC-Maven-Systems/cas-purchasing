@@ -41,7 +41,7 @@ import org.json.simple.JSONObject;
  * Printing for Purchase Order: the PO form and the summary/detailed reports.
  *
  * <p>
- * Works with any {@link PurchaseOrderMain} controller. An industry that prints
+ * Works with any {@link PurchaseOrder} controller. An industry that prints
  * differently extends this class and overrides
  * {@link #getPrintTemplatePath(String)} and/or
  * {@link #buildPrintDescription(int, String)}, then returns it from its
@@ -53,11 +53,11 @@ import org.json.simple.JSONObject;
  */
 public class PurchaseOrderPrinter {
 
-    protected final PurchaseOrderMain poPO;
+    protected final PurchaseOrder poPO;
     protected final GRiderCAS poGRider;
     protected final PurchaseOrderAudit poAudit;
 
-    public PurchaseOrderPrinter(PurchaseOrderMain foPO, GRiderCAS foGRider, PurchaseOrderAudit foAudit) {
+    public PurchaseOrderPrinter(PurchaseOrder foPO, GRiderCAS foGRider, PurchaseOrderAudit foAudit) {
         poPO = foPO;
         poGRider = foGRider;
         poAudit = foAudit;

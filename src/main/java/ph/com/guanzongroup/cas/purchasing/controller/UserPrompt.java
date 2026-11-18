@@ -14,7 +14,7 @@ import org.json.simple.JSONObject;
  * job, a web/mobile front end or a test supplies its own implementation, e.g.
  * {@link HeadlessUserPrompt}:</p>
  * <pre>
- * PurchaseOrderMain loPO = PurchaseOrderRegistry.create(industryId);
+ * PurchaseOrder loPO = PurchaseOrderRegistry.create(industryId);
  * loPO.setUserPrompt(new HeadlessUserPrompt());
  * </pre>
  */

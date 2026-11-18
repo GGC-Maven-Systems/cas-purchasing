@@ -1,38 +1,28 @@
 package ph.com.guanzongroup.cas.purchasing.controller;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.sql.rowset.CachedRowSet;
 import org.guanzon.appdriver.agent.services.Model;
-import org.guanzon.appdriver.agent.systables.TransactionAttachment;
-import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.base.SQLUtil;
 import org.guanzon.appdriver.constant.EditMode;
 import org.guanzon.appdriver.constant.RecordStatus;
 import org.guanzon.appdriver.constant.UserRight;
-import org.guanzon.cas.client.services.ClientControllers;
-import org.guanzon.cas.inv.services.InvControllers;
 import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Master;
 import org.guanzon.cas.inv.warehouse.services.InvWarehouseControllers;
 import org.guanzon.cas.parameter.model.Model_Project;
-import org.guanzon.cas.parameter.services.ParamControllers;
 import org.guanzon.cas.parameter.services.ParamModels;
-import org.guanzon.cas.purchasing.model.Model_PO_Detail;
 import org.guanzon.cas.purchasing.model.Model_PO_Master;
 import org.guanzon.cas.purchasing.services.PurchaseOrderModels;
 import org.guanzon.cas.purchasing.services.QuotationControllers;
 import ph.com.guanzongroup.cas.purchasing.status.POStatus;
-import org.guanzon.cas.purchasing.status.PurchaseOrderStaticData;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
 import ph.com.guanzongroup.cas.purchasing.validator.PurchaseOrderValidator;
 import ph.com.guanzongroup.cas.purchasing.validator.PurchaseOrder_General;
@@ -45,7 +35,7 @@ import ph.com.guanzongroup.cas.cashflow.services.CashflowControllers;
  * Purchase Order controller for General Inventory.
  *
  * <p>
- * {@link PurchaseOrderMain} runs the main procedures
+ * {@link PurchaseOrder} runs the main procedures
  * (Init/New/Open/Update/Save/Confirm/Approve/Cancel); this class plugs the
  * General Inventory work into them through the hooks and adds the rest:
  * Post/Void/Return, lists, discounts, status history, reports and the
@@ -66,24 +56,18 @@ import ph.com.guanzongroup.cas.cashflow.services.CashflowControllers;
  * Rules are in {@link PurchaseOrder_General}. The public methods are the same
  * as before, so the screens do not change.</p>
  */
-public class PurchaseOrderGeneral extends PurchaseOrderMain {
+public class PurchaseOrderGeneral extends PurchaseOrder {
 
     private static final Logger LOG = Logger.getLogger(PurchaseOrderGeneral.class.getName());
-    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     /** Purchase orders loaded by getPurchaseOrder / getConfirmedPurchaseOrder. */
     private List<Model_PO_Master> paPOMaster = new ArrayList<>();
-    /** Detail rows removed from the PO while editing. */
-    private List<Model> paDetailRemoved = new ArrayList<>();
     /** Date range of the last report query, shown on the printed report. */
     private String psReportDateFrom;
     private String psReportDateThru;
 
     private PurchaseOrderSourceDocuments poSourceDocuments;
     private PurchaseOrderAdvancePayment poAdvancePayment;
-    private PurchaseOrderSearch poSearch;
-    private PurchaseOrderAttachments poAttachments;
-    private PurchaseOrderAudit poAudit;
     private PurchaseOrderPrinter poPrinter;
 
     /** Engineering project referenced by the PO. */
@@ -107,14 +91,12 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
     @Override
     protected void initOthers() {
         SourceDocuments().reset();
-        paDetailRemoved = new ArrayList<>();
     }
 
-    /** Removed detail rows and the attachment count are needed by the rules. */
+    /** Stock requests / quotations loaded for the previous PO are dropped. */
     @Override
-    protected void prepareRules(PurchaseOrderValidator foRules) {
-        foRules.setRemovedDetail(new ArrayList<Object>(paDetailRemoved));
-        foRules.setActiveAttachmentCount(Attachments().getActiveCount());
+    protected void resetOthers() {
+        SourceDocuments().reset();
     }
 
     /**
@@ -212,127 +194,17 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
         return result(ApproveTransaction("Auto-approve after confirmation."));
     }
 
-    public JSONObject PostTransaction(String remarks) throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
-        //when called with a parent, the parent owns the DB transaction
-        return result(changeStatus(PurchaseOrderStatus.POSTED, remarks, remarks,
-                "Post Transaction", "Transaction posted successfully.", !pbWthParent));
-    }
-
-    public JSONObject VoidTransaction(String remarks) throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
-        return result(changeStatus(PurchaseOrderStatus.VOID, remarks, remarks,
-                "Void Transaction", "Transaction voided successfully.", true));
-    }
-
-    /**
-     * Returns the PO. Uses the validator and an approving officer (for
-     * encoders) instead of the authorization matrix.
-     */
-    public JSONObject ReturnTransaction(String remarks) throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
-        final String lsStatus = PurchaseOrderStatus.RETURNED;
-
-        if (getEditMode() != EditMode.READY) {
-            return result(errorJSON("No transaction was loaded."));
-        }
-
-        JSONObject loJSON = isEntryOkay(lsStatus);
-        if (!isSuccess(loJSON)) {
-            return result(loJSON);
-        }
-
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            loJSON = prompt().getUserApproval(poGRider);
-            if (!isSuccess(loJSON)) {
-                return result(loJSON);
-            }
-            if (Integer.parseInt(loJSON.get("nUserLevl").toString()) <= UserRight.ENCODER) {
-                return result(errorJSON("User is not an authorized approving officer.."));
-            }
-            setApproving((String) loJSON.get("sUserIDxx"));
-        }
-
-        loJSON = prepareStatusChange(lsStatus);
-        if (!isSuccess(loJSON)) {
-            return result(loJSON);
-        }
-
-        return result(inTransaction("Return Transaction", true, () -> {
-            JSONObject loStep = processStatusChange(lsStatus, remarks);
-            if (!isSuccess(loStep)) {
-                return loStep;
-            }
-            loStep = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), remarks, lsStatus, false, true);
-            if (!isSuccess(loStep)) {
-                return loStep;
-            }
-            return successJSON("Transaction returned successfully.");
-        }));
-    }
-
-    /** Cancels inside a parent's DB transaction (the parent rolls back on error). */
-    public JSONObject POCancelTransaction() throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
-        return result(writeStatus(PurchaseOrderStatus.CANCELLED, "CancelTransaction", "Transaction cancelled successfully."));
-    }
-
-    /** Puts back the previous status, inside a parent's DB transaction. */
-    public JSONObject RevertStatus() throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
-        String lsStatus = getPrevStatus();
-        if (lsStatus == null || lsStatus.isEmpty()) {
-            return result(successJSON());
-        }
-        return result(writeStatus(lsStatus, "RevertStatus", "Transaction status reverted successfully."));
-    }
-
-    private JSONObject writeStatus(String fsStatus, String fsRemarks, String fsSuccessMessage) {
-        try {
-            JSONObject loJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), fsRemarks, fsStatus, false, true);
-            return isSuccess(loJSON) ? successJSON(fsSuccessMessage) : loJSON;
-        } catch (GuanzonException | SQLException | CloneNotSupportedException ex) {
-            LOG.log(Level.SEVERE, MiscUtil.getException(ex), ex);
-            return errorJSON(MiscUtil.getException(ex));
-        }
-    }
-
-    /** Most recent status before the current one; empty when none. */
-    public String getPrevStatus() throws SQLException {
-        String lsSQL = PurchaseOrderQueries.previousStatus(Master().getTransactionNo(), Master().getTable(), Master().getTransactionStatus());
-        ResultSet loRS = poGRider.executeQuery(lsSQL);
-        if (loRS == null) {
-            return "";
-        }
-        try {
-            return loRS.next() ? loRS.getString("cRefrStat") : "";
-        } finally {
-            MiscUtil.close(loRS);
-        }
-    }
-
     // =====================================================================
     // Saving
     // =====================================================================
+    /**
+     * General Inventory save preparation (after the shared save rules, before
+     * the attachments): editing a confirmed PO updates its source documents;
+     * the engineering project title.
+     */
     @Override
-    public JSONObject willSave() throws SQLException, CloneNotSupportedException, GuanzonException {
-        //transaction no., drop empty rows, number the rows
-        prepareDetailsForSave();
-
+    protected JSONObject prepareIndustrySave() throws SQLException, CloneNotSupportedException, GuanzonException {
         String lsStatus = Master().getTransactionStatus();
-
-        //an encoder editing a confirmed PO needs an approving officer
-        if (PurchaseOrderStatus.CONFIRMED.equals(lsStatus) && pnEditMode == EditMode.UPDATE
-                && poGRider.getUserLevel() <= UserRight.ENCODER) {
-            JSONObject loJSON = prompt().getUserApproval(poGRider);
-            if (!isSuccess(loJSON)) {
-                return loJSON;
-            }
-            setApproving((String) loJSON.get("sUserIDxx"));
-        }
-
-        //a returned PO must have at least one change
-        if (PurchaseOrderStatus.RETURNED.equals(lsStatus)) {
-            JSONObject loJSON = checkReturnedEdit();
-            if (!isSuccess(loJSON)) {
-                return loJSON;
-            }
-        }
 
         //editing a confirmed PO updates its source documents
         if (PurchaseOrderStatus.CONFIRMED.equals(lsStatus)) {
@@ -349,98 +221,34 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
                 return loJSON;
             }
         }
-
-        //attachments: link to this PO, rename duplicates, upload unsent files
-        return Attachments().prepareForSave(Master().getTransactionNo(), Master().getBranchCode());
+        return successJSON();
     }
 
-    /** Compares with the saved record, read straight from the database. */
-    private JSONObject checkReturnedEdit() throws SQLException, GuanzonException, CloneNotSupportedException {
-        Model_PO_Master loSaved = new PurchaseOrderModels(poGRider).PurchaseOrderMaster();
-        JSONObject loJSON = loSaved.openRecord(Master().getTransactionNo());
+    /** Source documents, and the project title when a new PO is saved (after the attachments). */
+    @Override
+    protected JSONObject saveIndustryRecords() throws SQLException, CloneNotSupportedException, GuanzonException {
+        JSONObject loJSON = SourceDocuments().save();
         if (!isSuccess(loJSON)) {
+            poGRider.rollbackTrans();
             return loJSON;
         }
 
-        List<PurchaseOrderValidator.SavedLine> laLines = new ArrayList<>();
-        ResultSet loRS = poGRider.executeQuery(PurchaseOrderQueries.savedLines(Master().getTransactionNo()));
-        if (loRS == null) {
-            return errorJSON("Query execution failed.");
-        }
-        try {
-            while (loRS.next()) {
-                laLines.add(new PurchaseOrderValidator.SavedLine(loRS.getString("sStockIDx"), loRS.getDouble("nQuantity")));
-            }
-        } finally {
-            MiscUtil.close(loRS);
-        }
-        return rules().validateReturnedEditLines(loSaved, laLines);
-    }
-
-    @Override
-    public JSONObject saveOthers() {
-        try {
-            JSONObject loJSON = Attachments().save();
-            if (!isSuccess(loJSON)) {
-                return loJSON;
-            }
-
-            loJSON = SourceDocuments().save();
+        //the engineering project is tagged when a new PO is saved
+        String lsStatus = Master().getTransactionStatus();
+        if (Master().getEditMode() == EditMode.ADDNEW
+                && generalRules(lsStatus).isProjectTitleUpdateRequired(lsStatus, false)) {
+            loJSON = saveProjectTitle();
             if (!isSuccess(loJSON)) {
                 poGRider.rollbackTrans();
                 return loJSON;
             }
-
-            //the engineering project is tagged when a new PO is saved
-            String lsStatus = Master().getTransactionStatus();
-            if (Master().getEditMode() == EditMode.ADDNEW
-                    && generalRules(lsStatus).isProjectTitleUpdateRequired(lsStatus, false)) {
-                loJSON = saveProjectTitle();
-                if (!isSuccess(loJSON)) {
-                    poGRider.rollbackTrans();
-                    return loJSON;
-                }
-            }
-            return successJSON();
-        } catch (CloneNotSupportedException | SQLException | GuanzonException ex) {
-            LOG.log(Level.SEVERE, null, ex);
-            return errorJSON(ex.getMessage());
         }
+        return successJSON();
     }
 
     @Override
     public void initSQL() {
         SQL_BROWSE = PurchaseOrderQueries.browse();
-    }
-
-    // =====================================================================
-    // Detail grid
-    // =====================================================================
-    /** Adds a row when the last row has an item. */
-    public JSONObject AddDetail() throws CloneNotSupportedException {
-        JSONObject loJSON = rules().validateCanAddDetail();
-        if (!isSuccess(loJSON)) {
-            return result(loJSON);
-        }
-        return result(addDetail());
-    }
-
-    public int getDetailRemovedCount() {
-        return paDetailRemoved.size();
-    }
-
-    public Model_PO_Detail DetailRemove(int row) {
-        return (Model_PO_Detail) paDetailRemoved.get(row);
-    }
-
-    /** Quantity check: "tableRow" of the first zero line, "warning" "true" when all are zero. */
-    public JSONObject isDetailHasZeroQty() {
-        return result(rules().validateQuantities());
-    }
-
-    /** Status label for the screen (e.g. "APPROVED", "APPROVED+" while pending). */
-    public String getStatusValue() {
-        return POStatus.screenLabel(Master().getTransactionStatus());
     }
 
     // =====================================================================
@@ -532,18 +340,6 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
         return 0;
     }
 
-    public String getInventoryTypeCode() throws SQLException {
-        ResultSet loRS = poGRider.executeQuery(PurchaseOrderQueries.inventoryType(Master().getIndustryID(), Master().getCategoryCode()));
-        if (loRS == null) {
-            return null;
-        }
-        try {
-            return loRS.next() ? loRS.getString("sInvTypCd") : null;
-        } finally {
-            MiscUtil.close(loRS);
-        }
-    }
-
     /** " AND " + condition, or empty when there is no condition. */
     private static String andIfAny(String fsCondition) {
         return fsCondition.isEmpty() ? "" : " AND " + fsCondition;
@@ -573,37 +369,11 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
     }
 
     // =====================================================================
-    // Searches (same methods as before)
+    // Searches used by General Inventory only (shared ones are in PurchaseOrder)
     // =====================================================================
-    public JSONObject SearchBranch(String value, boolean byCode) throws SQLException, GuanzonException {
-        return result(Search().branch(value, byCode));
-    }
-
-    public JSONObject SearchIndustry(String value, boolean byCode) throws SQLException, GuanzonException {
-        return result(Search().industry(value, byCode));
-    }
-
-    public JSONObject SearchCategory(String value, boolean byCode) throws SQLException, GuanzonException {
-        return result(Search().category(value, byCode));
-    }
-
-    public JSONObject SearchTerm(String value, boolean byCode) throws SQLException, GuanzonException {
-        return result(Search().term(value, byCode));
-    }
-
-    public JSONObject SearchBarcode(String value, boolean byCode, int row, boolean hasNoSupplier)
-            throws SQLException, GuanzonException, CloneNotSupportedException {
-        return result(Search().inventory(value, byCode, row, hasNoSupplier, true, RecordStatus.ACTIVE, "Model: ", false));
-    }
-
     public JSONObject SearchBarcodeGeneral(String value, boolean byCode, int row, boolean hasNoSupplier)
             throws SQLException, GuanzonException, CloneNotSupportedException {
         return result(Search().inventory(value, byCode, row, hasNoSupplier, false, RecordStatus.ACTIVE, "Model: ", false));
-    }
-
-    public JSONObject SearchBarcodeDescription(String value, boolean byCode, int row, boolean hasNoSupplier)
-            throws SQLException, GuanzonException, CloneNotSupportedException {
-        return result(Search().inventory(value, byCode, row, hasNoSupplier, true, RecordStatus.ACTIVE, "Barcode: ", false));
     }
 
     public JSONObject SearchBarcodeDescriptionGeneral(String value, boolean byCode, int row, boolean hasNoSupplier)
@@ -611,37 +381,8 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
         return result(Search().inventory(value, byCode, row, hasNoSupplier, false, RecordStatus.ACTIVE, "Barcode: ", false));
     }
 
-    /** Includes inactive models (record statuses 1, 2, 3) and copies the brand. */
-    public JSONObject SearchModel(String value, boolean byCode, int row, boolean hasNoSupplier) throws SQLException, GuanzonException {
-        return result(Search().inventory(value, byCode, row, hasNoSupplier, true, "123", "Barcode: ", true));
-    }
-
-    public JSONObject SearchSupplier(String value, boolean byCode) throws SQLException, GuanzonException {
-        return result(Search().supplier(value, byCode));
-    }
-
     public JSONObject SearchProject(String value) throws SQLException, GuanzonException {
         return result(Search().project(value));
-    }
-
-    public JSONObject SearchPayee(String value) throws SQLException, GuanzonException {
-        return result(AdvancePayment().searchPayee(value));
-    }
-
-    public JSONObject SearchCompany(String value, boolean byCode) throws SQLException, GuanzonException {
-        return result(Search().company(value, byCode));
-    }
-
-    public JSONObject SearchDestination(String value, boolean byCode) throws SQLException, GuanzonException {
-        return result(Search().destination(value, byCode));
-    }
-
-    public JSONObject SearchDepartment(String value, boolean byCode) throws SQLException, GuanzonException {
-        return result(Search().department(value, byCode));
-    }
-
-    public JSONObject SearchBrand(String value, boolean byCode, int row) throws SQLException, GuanzonException {
-        return result(Search().brand(value, byCode, row));
     }
 
     public JSONObject SearchCategoryReports(String value, boolean byCode) throws SQLException, GuanzonException {
@@ -661,90 +402,21 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
     }
 
     // =====================================================================
-    // Discounts, advance payment and totals.
-    // Rules live in the validator; on a failed rule the field is reset to 0.
+    // Advance payment (General Inventory only; the payment request is built
+    // on approval, see prepareStatusChange / processStatusChange)
     // =====================================================================
-    public JSONObject setDiscountRate(String fsValue) {
-        return applyAmount(fsValue, lnValue -> rules().validateDiscountRate(lnValue),
-                lnValue -> Master().setDiscount(lnValue));
-    }
-
-    public JSONObject setDiscountAmount(String fsValue) {
-        return applyAmount(fsValue, lnValue -> rules().validateDiscountAmount(lnValue),
-                lnValue -> Master().setAdditionalDiscount(lnValue));
+    public JSONObject SearchPayee(String value) throws SQLException, GuanzonException {
+        return result(AdvancePayment().searchPayee(value));
     }
 
     public JSONObject setAdvancePaymentRate(String fsValue) {
-        return applyAmount(fsValue, lnValue -> rules().validateAdvancePaymentRate(lnValue),
+        return applyAmount(fsValue, lnValue -> generalRules(Master().getTransactionStatus()).validateAdvancePaymentRate(lnValue),
                 lnValue -> Master().setDownPaymentRatesPercentage(lnValue));
     }
 
     public JSONObject setAdvancePaymentAmount(String fsValue) {
-        return applyAmount(fsValue, lnValue -> rules().validateAdvancePaymentAmount(lnValue),
+        return applyAmount(fsValue, lnValue -> generalRules(Master().getTransactionStatus()).validateAdvancePaymentAmount(lnValue),
                 lnValue -> Master().setDownPaymentRatesAmount(lnValue));
-    }
-
-    @FunctionalInterface
-    private interface AmountRule {
-
-        JSONObject check(double fnValue);
-    }
-
-    /**
-     * Parses the entry, checks its rule, sets it, and checks the resulting net
-     * total. On any failure the field is set back to 0.
-     */
-    private JSONObject applyAmount(String fsValue, AmountRule foRule, Consumer<Double> foSetter) {
-        double lnValue;
-        try {
-            lnValue = fsValue == null || fsValue.trim().isEmpty()
-                    ? 0.0
-                    : new BigDecimal(fsValue.replace(",", "").trim()).doubleValue();
-        } catch (NumberFormatException ex) {
-            return result(resetAmount(foSetter, errorJSON("Invalid amount: " + fsValue)));
-        }
-
-        JSONObject loJSON = foRule.check(lnValue);
-        if (!isSuccess(loJSON)) {
-            return result(resetAmount(foSetter, loJSON));
-        }
-
-        foSetter.accept(lnValue);
-        computeNetTotal();
-
-        loJSON = rules().validateNetTotal();
-        if (!isSuccess(loJSON)) {
-            return result(resetAmount(foSetter, loJSON));
-        }
-        return result(loJSON);
-    }
-
-    private JSONObject resetAmount(Consumer<Double> foSetter, JSONObject foError) {
-        foSetter.accept(PurchaseOrderStaticData.default_value_double);
-        computeNetTotal();
-        return foError;
-    }
-
-    /** Net total = total - total x discount% - discount amount (4 decimals). */
-    public void computeNetTotal() {
-        BigDecimal ldTotal = PurchaseOrderAdvancePayment.money(Master().getTranTotal());
-        BigDecimal ldRateDiscount = ldTotal.multiply(PurchaseOrderAdvancePayment.money(Master().getDiscount()))
-                .divide(HUNDRED, 4, RoundingMode.HALF_UP);
-        BigDecimal ldNet = ldTotal.subtract(ldRateDiscount)
-                .subtract(PurchaseOrderAdvancePayment.money(Master().getAdditionalDiscount()));
-        Master().setNetTotal(ldNet.doubleValue());
-    }
-
-    /** Net total plus this line must stay below the limit; otherwise the line quantity goes back to 0. */
-    public JSONObject netTotalChecker(int pnRow) {
-        BigDecimal ldLine = PurchaseOrderAdvancePayment.money(Detail(pnRow).getQuantity())
-                .multiply(PurchaseOrderAdvancePayment.money(Detail(pnRow).getUnitPrice()));
-        JSONObject loJSON = rules().validateNetTotalWithLine(ldLine.doubleValue());
-        if (!isSuccess(loJSON)) {
-            Detail(pnRow).setQuantity(0);
-            computeNetTotal();
-        }
-        return result(loJSON);
     }
 
     // =====================================================================
@@ -930,34 +602,12 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
                 this::AddDetail);
     }
 
-    protected PurchaseOrderAdvancePayment createAdvancePayment() {
-        return new PurchaseOrderAdvancePayment(this, poGRider, () -> new CashflowControllers(poGRider, logwrapr));
-    }
-
-    protected PurchaseOrderSearch createSearch() {
-        return new PurchaseOrderSearch(this,
-                () -> new ParamControllers(poGRider, logwrapr),
-                () -> new InvControllers(poGRider, logwrapr),
-                () -> new ClientControllers(poGRider, logwrapr));
-    }
-
-    protected PurchaseOrderAttachments createAttachments() {
-        return new PurchaseOrderAttachments(poGRider, getSourceCode());
-    }
-
-    protected PurchaseOrderAudit createAudit() {
-        return new PurchaseOrderAudit(poGRider, getSourceCode());
-    }
-
     protected PurchaseOrderPrinter createPrinter() {
         return new PurchaseOrderPrinter(this, poGRider, Audit());
     }
 
-    public PurchaseOrderSourceDocuments SourceDocuments() {
-        if (poSourceDocuments == null) {
-            poSourceDocuments = createSourceDocuments();
-        }
-        return poSourceDocuments;
+    protected PurchaseOrderAdvancePayment createAdvancePayment() {
+        return new PurchaseOrderAdvancePayment(this, poGRider, () -> new CashflowControllers(poGRider, logwrapr));
     }
 
     public PurchaseOrderAdvancePayment AdvancePayment() {
@@ -967,25 +617,11 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
         return poAdvancePayment;
     }
 
-    public PurchaseOrderSearch Search() {
-        if (poSearch == null) {
-            poSearch = createSearch();
+    public PurchaseOrderSourceDocuments SourceDocuments() {
+        if (poSourceDocuments == null) {
+            poSourceDocuments = createSourceDocuments();
         }
-        return poSearch;
-    }
-
-    public PurchaseOrderAttachments Attachments() {
-        if (poAttachments == null) {
-            poAttachments = createAttachments();
-        }
-        return poAttachments;
-    }
-
-    public PurchaseOrderAudit Audit() {
-        if (poAudit == null) {
-            poAudit = createAudit();
-        }
-        return poAudit;
+        return poSourceDocuments;
     }
 
     public PurchaseOrderPrinter Printer() {
@@ -993,70 +629,6 @@ public class PurchaseOrderGeneral extends PurchaseOrderMain {
             poPrinter = createPrinter();
         }
         return poPrinter;
-    }
-
-    // ---- Attachments (same methods as before) ----
-    public void resetattachment() {
-        Attachments().reset();
-    }
-
-    public TransactionAttachment TransactionAttachmentList(int row) {
-        return Attachments().get(row);
-    }
-
-    public int getTransactionAttachmentCount() {
-        return Attachments().getCount();
-    }
-
-    public JSONObject addAttachment() throws SQLException, GuanzonException {
-        return result(Attachments().add());
-    }
-
-    public int addAttachment(String fFileName) throws SQLException, GuanzonException {
-        return Attachments().add(fFileName, Master().getTransactionNo());
-    }
-
-    public JSONObject removeAttachment(int fnRow) throws GuanzonException, SQLException {
-        return result(Attachments().remove(fnRow));
-    }
-
-    public void copyFile(String fsPath) {
-        result(Attachments().copyToTemp(fsPath));
-    }
-
-    public JSONObject loadAttachments() throws SQLException, GuanzonException {
-        return result(Attachments().load(Master().getTransactionNo(), Master().getEditMode() == EditMode.UPDATE));
-    }
-
-    /** @deprecated use {@code Attachments().upload(row, originalFileName)}; instance and access are not needed. */
-    @Deprecated
-    public JSONObject uploadCASAttachments(GRiderCAS instance, String access, int fnRow, String fsOriginalFileName) throws Exception {
-        return result(Attachments().upload(fnRow, fsOriginalFileName));
-    }
-
-    /** Error when the file name is already used by a saved attachment. */
-    public JSONObject checkExistingFileName(String fsFileName) throws SQLException, GuanzonException {
-        if (Attachments().isFileNameUsed(fsFileName)) {
-            return result(errorJSON("File name already exist in database.\nTry changing the file name to upload."));
-        }
-        return result(successJSON());
-    }
-
-    // ---- Audit trail ----
-    public List<String> getApprover() throws SQLException {
-        return Audit().getApprovers(Master().getTransactionNo());
-    }
-
-    public String getSysUser(String fsId) throws SQLException, GuanzonException {
-        return Audit().getSysUserName(fsId);
-    }
-
-    public JSONObject getEntryBy() throws SQLException, GuanzonException {
-        return result(Audit().getEntryBy(Master().getTable(), Master().getTransactionNo()));
-    }
-
-    public JSONObject getConfirmedBy() throws SQLException, GuanzonException {
-        return result(Audit().getConfirmedBy(Master().getTransactionNo()));
     }
 
     // ---- Printing ----

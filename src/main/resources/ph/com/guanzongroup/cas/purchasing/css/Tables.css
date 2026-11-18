@@ -1,0 +1,147 @@
+.table-view{
+    -fx-opacity: 1;
+    -fx-background-color: transparent;
+}
+.table-view:focused{
+    -fx-background-color: transparent;
+}
+
+.table-view .table-row-cell:disabled{
+    -fx-opacity: 1;
+}
+
+.table-view .column-header-background .label:disabled{
+    -fx-opacity: 1;
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+}
+.table-row-cell:empty {
+    -fx-background-color: white;
+}
+
+.table-row-cell:empty .table-cell {
+    -fx-border-width: 0px;
+}
+
+.table-view .column-header-background{
+    -fx-background-color: #4d5656;
+}
+
+.table-view .column-header-background .label{
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+}
+
+.table-view .filler, .table-view .column-header {
+    -fx-background-color: transparent;
+    -fx-size: 25px;
+}
+
+.table-view .table-cell{
+    -fx-text-fill: black;
+    -fx-font-size: 9pt;
+    /*-fx-font-weight: 300;*/
+    -fx-font-family: 'Open Sans','Helvetica Neue',Arial,sans-serif;
+}
+
+
+.table-view .column-header {
+    -fx-min-height: 25px; /* Sets minimum height */
+    -fx-pref-height: 25px; /* Sets preferred height */
+    -fx-max-height: 25px; /* Sets maximum height */
+}
+
+
+.table-row-cell{
+    -fx-background-color: -fx-table-cell-border-color, #D0D3D4;
+    -fx-background-insets: 0, 0 0 1 0;
+    -fx-padding: 0.0em; /* 0 */
+    -fx-cell-size: 25px;
+}
+.table-row-cell:selected {
+    -fx-background-color: #B3B6B7;
+    -fx-background-insets: 0;
+    -fx-background-radius: 1;
+}
+
+.table-row-cell:empty {
+    -fx-background-color: white;
+}
+
+.table-row-cell:empty .table-cell {
+    -fx-border-width: 0px;
+}
+
+.table-view > .virtual-flow > .scroll-bar:vertical,
+.table-view > .virtual-flow > .scroll-bar:vertical > .track,
+.table-view > .virtual-flow > .scroll-bar:vertical > .track-background,
+.table-view > .virtual-flow > .scroll-bar:horizontal,
+.table-view > .virtual-flow > .scroll-bar:horizontal > .track,
+.table-view > .virtual-flow > .scroll-bar:horizontal > .track-background {
+    -fx-background-color: transparent;
+}
+.table-row-cell:filled > .table-cell:selected,
+.table-row-cell:filled:selected > .table-cell {
+    -fx-background: -fx-selection-bar-non-focused;
+}
+.table-view{
+    -fx-border-color: #000000;
+    -fx-border-width: 1px 1px 1px 1px;
+}
+
+
+
+/* The main scrollbar track */
+.table-view .virtual-flow .scroll-bar:horizontal .track,
+.table-view .virtual-flow .scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 0em;
+    -fx-border-radius: 2em;
+}
+
+/* The increment and decrement buttons */
+.table-view .virtual-flow .scroll-bar:horizontal .increment-button,
+.table-view .virtual-flow .scroll-bar:horizontal .decrement-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0em;
+    -fx-padding: 0 0 10 0;
+
+}
+
+.table-view .virtual-flow .scroll-bar:vertical .increment-button,
+.table-view .virtual-flow .scroll-bar:vertical .decrement-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0em;
+    -fx-padding: 0 10 0 0;
+
+}
+
+/* Hide the arrows */
+.table-view .virtual-flow .scroll-bar .increment-arrow,
+.table-view .virtual-flow .scroll-bar .decrement-arrow {
+    -fx-shape: " ";
+    -fx-padding: 0;
+}
+
+/* The scrollbar thumb (the draggable part) */
+.table-view .virtual-flow .scroll-bar:horizontal .thumb,
+.table-view .virtual-flow .scroll-bar:vertical .thumb {
+    -fx-background-color: #C2C4C4;
+    -fx-background-insets: 2, 0, 0;
+    -fx-background-radius: 2em;
+}
+
+/* When pressed (clicked) */
+.table-view .virtual-flow .scroll-bar:horizontal .thumb:pressed,
+.table-view .virtual-flow .scroll-bar:vertical .thumb:pressed {
+    -fx-background-color: #979797;
+}
+.table-view .virtual-flow .scroll-bar:horizontal .thumb:hover,
+.table-view .virtual-flow .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #ababab;
+}
+.table-view .virtual-flow .scroll-bar .thumb:pressed,
+.table-view .virtual-flow .scroll-bar .thumb:pressed:hover {
+    -fx-background-color: #979797;
+}

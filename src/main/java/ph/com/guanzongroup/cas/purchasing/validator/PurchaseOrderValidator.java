@@ -23,6 +23,7 @@ import org.guanzon.cas.purchasing.model.Model_PO_Master;
 import org.guanzon.cas.purchasing.status.PurchaseOrderStatus;
 import org.json.simple.JSONObject;
 import org.guanzon.cas.purchasing.validator.StatusChangeValidator;
+import ph.com.guanzongroup.cas.purchasing.controller.PurchaseOrderQueries;
 
 /**
  * Base validator for Purchase Order. Holds every Purchase Order business rule.
@@ -251,13 +252,6 @@ public abstract class PurchaseOrderValidator implements GValidator {
             return error("Invalid Term.");
         }
 
-        if (poMaster.getWithAdvPaym()) {
-            if (money(poMaster.getDownPaymentRatesPercentage()).signum() <= 0
-                    && money(poMaster.getDownPaymentRatesAmount()).signum() <= 0) {
-                return error("You selected advance rate, but no Adv Rate and Adv Amount.");
-            }
-        }
-
         if (poMaster.getEditMode() == EditMode.ADDNEW
                 && isReferenceRequiredForBackdate()
                 && ldTransact.isBefore(ldServer)
@@ -381,14 +375,16 @@ public abstract class PurchaseOrderValidator implements GValidator {
             throws SQLException, GuanzonException, CloneNotSupportedException {
         double lnApproved = foDetail.InvStockRequestDetail().getApproved();
 
-        //remaining = nApproved - (nCancelld + nIssueQty + nOrderQty)
+        //remaining = nApproved - (nCancelld + nIssueQty + quantity ordered by OTHER POs).
+        //This PO's own order is left out: once confirmed it is already in the
+        //request's ordered quantity, and must not block its own approval or edit.
         if (PurchaseOrderStatus.CONFIRMED.equals(psTranStat)
                 || PurchaseOrderStatus.APPROVED.equals(psTranStat)) {
             double lnRemaining = lnApproved
                     - (foDetail.InvStockRequestDetail().getCancelled()
                     + foDetail.InvStockRequestDetail().getIssued()
-                    + foDetail.InvStockRequestDetail().getPurchase());
-            if (lnRemaining == 0.00) {
+                    + getOrderedByOtherPOs(foDetail));
+            if (lnRemaining <= 0.00) {
                 return error("Discrepancy: Stock requests related to this order number have already been processed.");
             }
         }
@@ -402,6 +398,24 @@ public abstract class PurchaseOrderValidator implements GValidator {
         }
 
         return success();
+    }
+
+    /**
+     * Quantity of this stock request item ordered by other confirmed/approved
+     * Purchase Orders (this PO excluded).
+     */
+    protected double getOrderedByOtherPOs(Model_PO_Detail foDetail) throws SQLException {
+        String lsSQL = PurchaseOrderQueries.orderedQuantity(foDetail.getSouceNo(), foDetail.getStockID(),
+                PurchaseOrderStatus.SourceCode.STOCKREQUEST, poMaster.getTransactionNo());
+        ResultSet loRS = poGrider.executeQuery(lsSQL);
+        if (loRS == null) {
+            throw new SQLException("Unable to check the ordered quantity of the stock request.");
+        }
+        try {
+            return loRS.next() ? loRS.getDouble("nQuantity") : 0.00;
+        } finally {
+            loRS.close();
+        }
     }
 
     /**
@@ -542,40 +556,7 @@ public abstract class PurchaseOrderValidator implements GValidator {
         return success();
     }
 
-    public JSONObject validateAdvancePaymentRate(double fnRate) {
-        BigDecimal ldAfterDiscounts = getAmountAfterDiscounts();
-        if (ldAfterDiscounts.signum() <= 0) {
-            return error("Invalid Advance Payment Rate, the total transaction amount is 0.0000");
-        }
-        if (fnRate < 0.0000 || fnRate > 100.0000) {
-            return error("Invalid Advance Payment Rate. Must be between 0.0000 and 100.0000");
-        }
-        BigDecimal ldTotalAdvance = percentOf(ldAfterDiscounts, money(fnRate))
-                .add(money(poMaster.getDownPaymentRatesAmount()));
-        if (ldTotalAdvance.compareTo(ldAfterDiscounts) > 0) {
-            return error("Invalid Downpayment Total.");
-        }
-        return success();
-    }
-
-    public JSONObject validateAdvancePaymentAmount(double fnAmount) {
-        BigDecimal ldAfterDiscounts = getAmountAfterDiscounts();
-        if (ldAfterDiscounts.signum() <= 0) {
-            return error("Invalid Advance Payment Amount, the total transaction amount is 0.0000");
-        }
-        BigDecimal ldAmount = money(fnAmount);
-        if (ldAmount.signum() < 0 || ldAmount.compareTo(ldAfterDiscounts) > 0) {
-            return error("Invalid Advance Payment Amount");
-        }
-        BigDecimal ldTotalAdvance = percentOf(ldAfterDiscounts, money(poMaster.getDownPaymentRatesPercentage()))
-                .add(ldAmount);
-        if (ldTotalAdvance.compareTo(ldAfterDiscounts) > 0) {
-            return error("Invalid Downpayment Total.");
-        }
-        return success();
-    }
-
-    /** Net total after a discount or advance change must not be negative. */
+    /** Net total after a discount change must not be negative. */
     public JSONObject validateNetTotal() {
         if (money(poMaster.getNetTotal()).signum() < 0) {
             return error("Invalid Total Transaction Amount");

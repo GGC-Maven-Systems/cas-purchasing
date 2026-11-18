@@ -26,17 +26,17 @@ import org.json.simple.JSONObject;
  *
  * <p>
  * Each search opens the lookup dialog of its parameter and, when a record is
- * picked, copies it into the PO. Works with any {@link PurchaseOrderMain}
+ * picked, copies it into the PO. Works with any {@link PurchaseOrder}
  * controller; the ...ForReport searches only return the picked record.</p>
  */
 public class PurchaseOrderSearch {
 
-    private final PurchaseOrderMain poPO;
+    private final PurchaseOrder poPO;
     private final Supplier<ParamControllers> poParams;
     private final Supplier<InvControllers> poInventory;
     private final Supplier<ClientControllers> poClients;
 
-    public PurchaseOrderSearch(PurchaseOrderMain foPO, Supplier<ParamControllers> foParams,
+    public PurchaseOrderSearch(PurchaseOrder foPO, Supplier<ParamControllers> foParams,
             Supplier<InvControllers> foInventory, Supplier<ClientControllers> foClients) {
         poPO = foPO;
         poParams = foParams;

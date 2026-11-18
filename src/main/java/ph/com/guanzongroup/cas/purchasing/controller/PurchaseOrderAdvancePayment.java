@@ -32,14 +32,14 @@ public class PurchaseOrderAdvancePayment {
     private static final Logger LOG = Logger.getLogger(PurchaseOrderAdvancePayment.class.getName());
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
-    private final PurchaseOrderMain poPO;
+    private final PurchaseOrder poPO;
     private final GRiderCAS poGRider;
     private final Supplier<CashflowControllers> poCashflow;
 
     private CashflowControllers poPaymentRequest;
     private String psPayeeId;
 
-    public PurchaseOrderAdvancePayment(PurchaseOrderMain foPO, GRiderCAS foGRider, Supplier<CashflowControllers> foCashflow) {
+    public PurchaseOrderAdvancePayment(PurchaseOrder foPO, GRiderCAS foGRider, Supplier<CashflowControllers> foCashflow) {
         poPO = foPO;
         poGRider = foGRider;
         poCashflow = foCashflow;

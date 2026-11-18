@@ -10,7 +10,7 @@ import org.json.simple.JSONObject;
  * Purchase Order controller for the Spare Parts industry.
  *
  * <p>
- * Extends {@link PurchaseOrderMain}, which already runs InitTransaction,
+ * Extends {@link PurchaseOrder}, which already runs InitTransaction,
  * NewTransaction, OpenTransaction, UpdateTransaction, SaveTransaction,
  * ConfirmTransaction, ApproveTransaction and CancelTransaction (including the
  * authorization matrix and the inventory ledger). Fill in the TODOs with the
@@ -19,10 +19,10 @@ import org.json.simple.JSONObject;
  *
  * <p>
  * Reusable helpers (see PurchaseOrderGeneral.create... for how to build them):
- * PurchaseOrderSearch, PurchaseOrderSourceDocuments, PurchaseOrderAdvancePayment,
+ * PurchaseOrderSearch, PurchaseOrderSourceDocuments,
  * PurchaseOrderAttachments, PurchaseOrderAudit, PurchaseOrderPrinter.</p>
  */
-public class PurchaseOrderSP extends PurchaseOrderMain {
+public class PurchaseOrderSP extends PurchaseOrder {
 
     // =====================================================================
     // Required
@@ -42,24 +42,28 @@ public class PurchaseOrderSP extends PurchaseOrderMain {
                 + " FROM PO_Master a";
     }
 
+    // Saving: PurchaseOrder.willSave / saveOthers already prepare the rows,
+    // run the shared save rules and save the attachments.
     @Override
-    public JSONObject willSave() throws SQLException, CloneNotSupportedException, GuanzonException {
-        //transaction no., drop empty rows, number the rows
-        prepareDetailsForSave();
-
+    protected JSONObject prepareIndustrySave() throws SQLException, CloneNotSupportedException, GuanzonException {
         //TODO Spare Parts-specific preparation before saving
         return successJSON();
     }
 
     @Override
-    public JSONObject saveOthers() {
-        //TODO Spare Parts records saved together with the PO
+    protected JSONObject saveIndustryRecords() throws SQLException, CloneNotSupportedException, GuanzonException {
+        //TODO Spare Parts records saved together with the PO; a non-success result rolls back
         return successJSON();
     }
 
     // =====================================================================
     // Optional hooks (delete the ones you don't need)
     // =====================================================================
+    @Override
+    protected void resetOthers() {
+        //TODO clear Spare Parts objects of the previous PO (called by New / Open)
+    }
+
     @Override
     protected void initOthers() {
         //TODO Spare Parts objects created by InitTransaction

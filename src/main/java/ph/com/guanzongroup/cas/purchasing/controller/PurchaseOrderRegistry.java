@@ -21,8 +21,8 @@ import java.util.function.Supplier;
  * package ph.com.guanzongroup.cas.purchasing.services;
  *
  * public class PurchaseOrderControllers {
- *     public PurchaseOrderMain PurchaseOrder(String industryId) {
- *         PurchaseOrderMain loPO = PurchaseOrderRegistry.create(industryId);
+ *     public PurchaseOrder PurchaseOrder(String industryId) {
+ *         PurchaseOrder loPO = PurchaseOrderRegistry.create(industryId);
  *         //...same setup the old PurchaseOrder() method does...
  *         return loPO;
  *     }
@@ -48,12 +48,12 @@ public final class PurchaseOrderRegistry {
     }
 
     /** Controller for any industry not registered below. */
-    private static final Supplier<PurchaseOrderMain> DEFAULT = PurchaseOrderGeneral::new;
+    private static final Supplier<PurchaseOrder> DEFAULT = PurchaseOrderGeneral::new;
 
-    private static final Map<String, Supplier<PurchaseOrderMain>> CONTROLLERS;
+    private static final Map<String, Supplier<PurchaseOrder>> CONTROLLERS;
 
     static {
-        Map<String, Supplier<PurchaseOrderMain>> loMap = new HashMap<>();
+        Map<String, Supplier<PurchaseOrder>> loMap = new HashMap<>();
         //Keep an industry commented out (it then uses General) until its
         //controller's TODOs are filled in.
         register(loMap, IndustryCode.MOTORCYCLE, PurchaseOrderMC::new);
@@ -66,8 +66,8 @@ public final class PurchaseOrderRegistry {
     private PurchaseOrderRegistry() {
     }
 
-    private static void register(Map<String, Supplier<PurchaseOrderMain>> foMap,
-            String fsIndustryId, Supplier<PurchaseOrderMain> foController) {
+    private static void register(Map<String, Supplier<PurchaseOrder>> foMap,
+            String fsIndustryId, Supplier<PurchaseOrder> foController) {
         if (fsIndustryId == null || fsIndustryId.trim().isEmpty()) {
             return;
         }
@@ -77,8 +77,8 @@ public final class PurchaseOrderRegistry {
     }
 
     /** New, uninitialized controller for the industry (General when not registered). */
-    public static PurchaseOrderMain create(String fsIndustryId) {
-        Supplier<PurchaseOrderMain> loController = fsIndustryId == null ? null : CONTROLLERS.get(fsIndustryId);
+    public static PurchaseOrder create(String fsIndustryId) {
+        Supplier<PurchaseOrder> loController = fsIndustryId == null ? null : CONTROLLERS.get(fsIndustryId);
         return (loController != null ? loController : DEFAULT).get();
     }
 

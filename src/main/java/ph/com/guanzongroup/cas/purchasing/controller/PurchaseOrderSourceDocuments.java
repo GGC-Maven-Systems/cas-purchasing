@@ -41,7 +41,7 @@ import org.guanzon.cas.purchasing.controller.POQuotation;
  * inside it.</li>
  * </ul>
  *
- * Works with any {@link PurchaseOrderMain} controller.
+ * Works with any {@link PurchaseOrder} controller.
  */
 public class PurchaseOrderSourceDocuments {
 
@@ -54,7 +54,7 @@ public class PurchaseOrderSourceDocuments {
         JSONObject addRow() throws CloneNotSupportedException;
     }
 
-    private final PurchaseOrderMain poPO;
+    private final PurchaseOrder poPO;
     private final GRiderCAS poGRider;
     private final Supplier<InvWarehouseControllers> poWarehouse;
     private final Supplier<QuotationControllers> poQuotations;
@@ -69,7 +69,7 @@ public class PurchaseOrderSourceDocuments {
     /** Quotations on removed lines, released when no other PO uses them. */
     private List<POQuotation> paRemovedQuotationStatus = new ArrayList<>();
 
-    public PurchaseOrderSourceDocuments(PurchaseOrderMain foPO, GRiderCAS foGRider,
+    public PurchaseOrderSourceDocuments(PurchaseOrder foPO, GRiderCAS foGRider,
             Supplier<InvWarehouseControllers> foWarehouse, Supplier<QuotationControllers> foQuotations,
             RowAdder foRowAdder) {
         poPO = foPO;
@@ -122,7 +122,7 @@ public class PurchaseOrderSourceDocuments {
             return;
         }
         if (PurchaseOrderStatus.SourceCode.STOCKREQUEST.equals(foDetail.getSouceCode())) {
-            updateStockRequest(fsStatus, lsSourceNo, foDetail.getStockID(), foDetail.getQuantity().doubleValue());
+            updateStockRequest(fsStatus, lsSourceNo, foDetail.getStockID(), foDetail.getQuantity().doubleValue(), fbRemoved);
         } else if (PurchaseOrderStatus.SourceCode.POQUOTATION.equals(foDetail.getSouceCode())) {
             addQuotation(lsSourceNo, fbRemoved);
         }
@@ -157,8 +157,19 @@ public class PurchaseOrderSourceDocuments {
         return loQuotation;
     }
 
-    /** Sets the ordered quantity of one stock request item for the new status. */
-    private void updateStockRequest(String fsStatus, String fsRequestNo, String fsStockId, double fnQuantity)
+    /**
+     * Sets the ordered quantity of one stock request item for the new status.
+     *
+     * <ul>
+     * <li>CONFIRMED: what other POs ordered, plus this line (a line removed
+     * from the PO no longer counts).</li>
+     * <li>APPROVED: unchanged; the request is marked processed.</li>
+     * <li>CANCELLED: what other POs ordered (this PO no longer counts).</li>
+     * <li>VOID / RETURNED: the ordered total less this line.</li>
+     * </ul>
+     */
+    private void updateStockRequest(String fsStatus, String fsRequestNo, String fsStockId, double fnQuantity,
+            boolean fbRemoved)
             throws SQLException, GuanzonException, CloneNotSupportedException {
         StockRequest loRequest = null;
         for (StockRequest loLoaded : paStockRequests) {
@@ -183,13 +194,18 @@ public class PurchaseOrderSourceDocuments {
             double lnOrdered;
             switch (fsStatus) {
                 case PurchaseOrderStatus.CONFIRMED:
-                    lnOrdered = getOrderedQuantity(fsRequestNo, fsStockId, loRequest.getSourceCode(), true) + fnQuantity;
+                    lnOrdered = getOrderedQuantity(fsRequestNo, fsStockId, loRequest.getSourceCode(), true)
+                            + (fbRemoved ? 0 : fnQuantity);
                     break;
                 case PurchaseOrderStatus.APPROVED:
                     lnOrdered = loRequest.Detail(lnRow).getPurchase();
                     loRequest.Master().setProcessed(true);
                     loRequest.Master().setModifiedDate(poGRider.getServerDate());
                     loRequest.Master().setModifyingId(poGRider.getUserID());
+                    break;
+                case PurchaseOrderStatus.CANCELLED:
+                    //only this PO's quantity is released; other POs' orders stay
+                    lnOrdered = getOrderedQuantity(fsRequestNo, fsStockId, loRequest.getSourceCode(), true);
                     break;
                 case PurchaseOrderStatus.VOID:
                 case PurchaseOrderStatus.RETURNED:
@@ -423,9 +439,8 @@ public class PurchaseOrderSourceDocuments {
             loLine.setRecordOrder(0);
             loLine.setUnitPrice(loRequest.Detail(lnCtr).Inventory().getCost().doubleValue());
             loLine.setQuantity(0);
-            //NOTE: the source code stored here is the PO's own source code (as before),
-            //not PurchaseOrderStatus.SourceCode.STOCKREQUEST; see the README.
-            loLine.setSouceCode(poPO.getSourceCode());
+            //stock-request lines are marked InvR so status changes update the request
+            loLine.setSouceCode(PurchaseOrderStatus.SourceCode.STOCKREQUEST);
         }
 
         if (lbAllProcessed) {
