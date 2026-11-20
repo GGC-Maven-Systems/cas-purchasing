@@ -8633,9 +8633,12 @@ public class PurchaseOrderReceiving extends Transaction {
             }
 
             lsFilter.add("a.sCompnyID = " + SQLUtil.toSQL(Master().getCompanyId())
-                    + " AND a.sIndstCdx = " +  SQLUtil.toSQL(Master().getIndustryId())
-                    + " AND a.sTransNox LIKE " + SQLUtil.toSQL(poGRider.getBranchCode() + "%"));
+                    + " AND a.sIndstCdx = " +  SQLUtil.toSQL(Master().getIndustryId()));
+                 ///   + " AND a.sTransNox LIKE " + SQLUtil.toSQL(poGRider.getBranchCode() + "%"));
 
+            if(poGRider.getUserLevel()<=UserRight.ENCODER){
+                lsFilter.add("a.sTransNox LIKE " + SQLUtil.toSQL(poGRider.getBranchCode() + "%"));
+            }
             if (psTranStat.length() > 1) {
                 for (int lnCtr = 0; lnCtr <= psTranStat.length() - 1; lnCtr++) {
                     lsTransStat += ", " + SQLUtil.toSQL(Character.toString(psTranStat.charAt(lnCtr)));
@@ -8876,9 +8879,12 @@ public class PurchaseOrderReceiving extends Transaction {
             }
 
             lsFilter.add("b.sCompnyID = " + SQLUtil.toSQL(Master().getCompanyId())
-                    + " AND b.sIndstCdx = " +  SQLUtil.toSQL(Master().getIndustryId())
-                    + " AND b.sTransNox LIKE " +  SQLUtil.toSQL(poGRider.getBranchCode()+ "%") );
+                    + " AND b.sIndstCdx = " +  SQLUtil.toSQL(Master().getIndustryId()));
+                ///   + " AND a.sTransNox LIKE " + SQLUtil.toSQL(poGRider.getBranchCode() + "%"));
 
+            if(poGRider.getUserLevel()<=UserRight.ENCODER){
+                lsFilter.add("a.sTransNox LIKE " + SQLUtil.toSQL(poGRider.getBranchCode() + "%"));
+            }
             if (psTranStat.length() > 1) {
                 for (int lnCtr = 0; lnCtr <= psTranStat.length() - 1; lnCtr++) {
                     lsTransStat += ", " + SQLUtil.toSQL(Character.toString(psTranStat.charAt(lnCtr)));
