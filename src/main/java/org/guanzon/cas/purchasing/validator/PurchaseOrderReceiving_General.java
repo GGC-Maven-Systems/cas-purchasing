@@ -279,165 +279,165 @@ public class PurchaseOrderReceiving_General implements GValidator{
             poJSON.put("message", "Invalid Term.");
             return poJSON;
         }
-
-        poMatrix = new MatrixAuthManager(poGRider, SOURCE_CD, poMaster.getTransactionNo());
-        
-        //Get the difference of purchase order receiving and purchase order
-        String lsSQL = "SELECT " +
-                            "  COALESCE(a.sTransNox, b.sTransNox) AS sTransNox" +
-                            ", COALESCE(c.sStockIDx, d.sStockIDx) AS sStockIDx" +
-                            ", ((IFNULL(b.nTranTotl, 0) - IFNULL(a.nTranTotl, 0)) / NULLIF(b.nTranTotl, 0) * 100) AS nTotlDiff" +
-                            ", ((IFNULL(d.nQuantity, 0) - IFNULL(c.nQuantity, 0)) / NULLIF(d.nQuantity, 0) * 100) AS nQtyxDiff" +
-                            ", ((IFNULL(d.nUnitPrce, 0) - IFNULL(c.nUnitPrce, 0)) / NULLIF(d.nUnitPrce, 0) * 100) AS nPrceDiff" +
-                            ", c.sOrderNox" +
-                            ", b.nTranTotl nPTotlAmt" +
-                            ", a.nTranTotl nRTotlAmt" +
-                            ", d.nQuantity nPOQtyxxx" +
-                            ", c.nQuantity nRcQtyxxx" +
-                            ", d.nUnitPrce nPUntPrce" +
-                            ", c.nUnitPrce nRUntPrce" +
-                      " FROM PO_Receiving_Master a" +
-                            " LEFT JOIN PO_Receiving_Detail c ON a.sTransNox = c.sTransNox" +
-                            " LEFT JOIN PO_Detail d ON c.sOrderNox = d.sTransNox AND c.sStockIDx = d.sStockIDx " +
-                            " LEFT JOIN PO_Master b ON d.sTransNox = b.sTransNox" +
-                      " WHERE a.sTransNox = " + SQLUtil.toSQL(poMaster.getTransactionNo()) +
-                      " UNION" +
-                      " SELECT " +
-                            "  COALESCE(a.sTransNox, b.sTransNox) AS sTransNox" +
-                            ", COALESCE(c.sStockIDx, d.sStockIDx) AS sStockIDx" +
-                            ", ((IFNULL(b.nTranTotl, 0) - IFNULL(a.nTranTotl, 0)) / NULLIF(b.nTranTotl, 0) * 100) AS nTotlDiff" +
-                            ", ((IFNULL(d.nQuantity, 0) - IFNULL(c.nQuantity, 0)) / NULLIF(d.nQuantity, 0) * 100) AS nQtyxDiff" +
-                            ", ((IFNULL(d.nUnitPrce, 0) - IFNULL(c.nUnitPrce, 0)) / NULLIF(d.nUnitPrce, 0) * 100) AS nPrceDiff" +
-                            ", c.sOrderNox" +
-                            ", b.nTranTotl nPTotlAmt" +
-                            ", a.nTranTotl nRTotlAmt" +
-                            ", d.nQuantity nPOQtyxxx" +
-                            ", c.nQuantity nRcQtyxxx" +
-                            ", d.nUnitPrce nPUntPrce" +
-                            ", c.nUnitPrce nRUntPrce" +
-                      " FROM PO_Receiving_Master a" +
-                            " RIGHT JOIN PO_Receiving_Detail c ON a.sTransNox = c.sTransNox" +
-                            " RIGHT JOIN PO_Detail d ON c.sOrderNox = d.sTransNox AND c.sStockIDx = d.sStockIDx " +
-                            " RIGHT JOIN PO_Master b ON d.sTransNox = b.sTransNox" +
-                      " WHERE a.sTransNox = " + SQLUtil.toSQL(poMaster.getTransactionNo());
-        ResultSet loRS = poGRider.executeQuery(lsSQL);
-        
-        //set to 100% meaning no purchase order
-        double lnTotlDiff = 100;
-        double lnQtyxDiff = 100;
-        double lnPrceDiff = 100;
-        
-        double lnPTotlAmt = 0;
-        double lnRTotlAmt = 0;
-        
-        int lnRecCtrxx = 0;
-        int lnNullCtrx = 0;
-        
-        //Check for the overall difference between the purchase delivery and purchase order...
-        String lsRemarks;
-        while(loRS.next()){
-            //Get the total purchase receiving total amount
-            if(lnRTotlAmt == 0){
-                lnRTotlAmt = loRS.getDouble("nRTotlAmt");
-            }
-
-            //Count the number of records and the number of records with no order no
-            lnRecCtrxx++;
-            if(loRS.getString("sOrderNox").isEmpty()){
-                lnNullCtrx++;
-                continue;
-            }
-            
-            //set the purchase order total, purchase receiving total, and their difference if not yet set
-            if(lnTotlDiff != 100){
-                lnTotlDiff = loRS.getDouble("nTotlDiff");
-                lnPTotlAmt = loRS.getDouble("nPTotlAmt");
-            }  
-            
-            //A difference of positive value means that purchase order quantity is higher than purchase delivery quantity
-            //A difference of negative value means that purchase order quantity is lower than purchase delivery quantity
-            //A difference of zero(0) means the quantity is the same...
-            if(loRS.getDouble("nQtyxDiff") < lnQtyxDiff){
-                lnQtyxDiff = loRS.getDouble("nQtyxDiff");
-            }
-            
-            //A difference of positive value means that purchase order price is higher than purchase delivery price
-            //A difference of negative value means that purchase order price is lower than purchase delivery price
-            //A difference of zero(0) means the price is the same...
-            if(loRS.getDouble("nPrceDiff") < lnPrceDiff){
-                lnPrceDiff = loRS.getDouble("nPrceDiff");
-            }
-        }
-
-        //Is the purchase delivery  without a purchase order or is there an item delivered but not ordered
-        if(lnRecCtrxx == lnNullCtrx || lnNullCtrx != 0){
-            lsRemarks = poMaster.getBranchCode()  
-                + "/" + poMaster.getTransactionNo() 
-                + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
-                + ";" + poMaster.getTransactionTotal().toString() 
-                + ";" + poMaster.getRemarks();
-            
-            String lsAuthCode = poMatrix.getAuthType("PURCHASE ORDER MATRIX", String.valueOf(poMaster.getTransactionTotal().toString()), "");
-            poMatrix.addAuthRequest(lsAuthCode, "", "", lsRemarks);
-        }
-        else{
-            //check if price of delivered items are higher than the purchase order
-            if(lnPrceDiff < 0){
-                lsRemarks = poMaster.getBranchCode()
-                    + "/" + poMaster.getTransactionNo() 
-                    + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
-                    + "; Discrepancy in Unit Price: " + String.valueOf(Math.abs(lnPrceDiff)) 
-                    + ";" + poMaster.getRemarks();
-
-                String lsAuthCode = poMatrix.getAuthType("PURCHASE PRICE DISCREPANCY", String.valueOf(Math.abs(lnPrceDiff)), "");
-                if(!lsAuthCode.isEmpty()){
-                    poMatrix.addAuthRequest(lsAuthCode, "", "", lsRemarks);
-                }
-            }
-            
-            //check if quantity of delivered items are higher than the purchase order
-            if(lnQtyxDiff < 0){
-                lsRemarks = poMaster.getBranchCode()
-                    + "/" + poMaster.getTransactionNo() 
-                    + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
-                    + "; Discrepancy in Quantity Delivered: " + String.valueOf(Math.abs(lnQtyxDiff)) 
-                    + ";" + poMaster.getRemarks();
-
-                String lsAuthCode = poMatrix.getAuthType("PURCHASE QUANTITY DISCREPANCY", String.valueOf(Math.abs(lnQtyxDiff)), "");
-                if(!lsAuthCode.isEmpty()){
-                    poMatrix.addAuthRequest(lsAuthCode, "", "", lsRemarks);
-                }
-            }
-            
-            //chekc if quantity or price from delivery is higher the purchase order
-            if(lnPrceDiff < 0 || lnQtyxDiff < 0 ){
-                String lsAuthCod1 = poMatrix.getAuthType("PURCHASE ORDER MATRIX", String.valueOf(lnRTotlAmt), "");
-                String lsAuthCod2 = poMatrix.getAuthType("PURCHASE ORDER MATRIX", String.valueOf(lnPTotlAmt), "");
-
-                //If authcode of purchase order is different from supposedly authcode of purchase delivery then create authcode
-                if(!lsAuthCod1.equalsIgnoreCase(lsAuthCod2)){
-                    lsRemarks = poMaster.getBranchCode()  
-                        + "/" + poMaster.getTransactionNo() 
-                        + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
-                        + ";" + poMaster.getTransactionTotal().toString() 
-                        + ";" + poMaster.getRemarks();
-
-                    poMatrix.addAuthRequest(lsAuthCod1, "", "", lsRemarks);
-                }
-            }
-        }
-        
-        if(poMatrix.hasAuthRequest()){
-            try {
-                poJSON = poMatrix.processAuth();
-            } catch (GuanzonException ex) {
-                poJSON.put("result", "error");
-                poJSON.put("message", ex.getMessage());
-                return poJSON;
-            }
-            return poJSON;
-        }
-        
+//2026-11-21 -c/o mam she -maynard
+//        poMatrix = new MatrixAuthManager(poGRider, SOURCE_CD, poMaster.getTransactionNo());
+//        
+//        //Get the difference of purchase order receiving and purchase order
+//        String lsSQL = "SELECT " +
+//                            "  COALESCE(a.sTransNox, b.sTransNox) AS sTransNox" +
+//                            ", COALESCE(c.sStockIDx, d.sStockIDx) AS sStockIDx" +
+//                            ", ((IFNULL(b.nTranTotl, 0) - IFNULL(a.nTranTotl, 0)) / NULLIF(b.nTranTotl, 0) * 100) AS nTotlDiff" +
+//                            ", ((IFNULL(d.nQuantity, 0) - IFNULL(c.nQuantity, 0)) / NULLIF(d.nQuantity, 0) * 100) AS nQtyxDiff" +
+//                            ", ((IFNULL(d.nUnitPrce, 0) - IFNULL(c.nUnitPrce, 0)) / NULLIF(d.nUnitPrce, 0) * 100) AS nPrceDiff" +
+//                            ", c.sOrderNox" +
+//                            ", b.nTranTotl nPTotlAmt" +
+//                            ", a.nTranTotl nRTotlAmt" +
+//                            ", d.nQuantity nPOQtyxxx" +
+//                            ", c.nQuantity nRcQtyxxx" +
+//                            ", d.nUnitPrce nPUntPrce" +
+//                            ", c.nUnitPrce nRUntPrce" +
+//                      " FROM PO_Receiving_Master a" +
+//                            " LEFT JOIN PO_Receiving_Detail c ON a.sTransNox = c.sTransNox" +
+//                            " LEFT JOIN PO_Detail d ON c.sOrderNox = d.sTransNox AND c.sStockIDx = d.sStockIDx " +
+//                            " LEFT JOIN PO_Master b ON d.sTransNox = b.sTransNox" +
+//                      " WHERE a.sTransNox = " + SQLUtil.toSQL(poMaster.getTransactionNo()) +
+//                      " UNION" +
+//                      " SELECT " +
+//                            "  COALESCE(a.sTransNox, b.sTransNox) AS sTransNox" +
+//                            ", COALESCE(c.sStockIDx, d.sStockIDx) AS sStockIDx" +
+//                            ", ((IFNULL(b.nTranTotl, 0) - IFNULL(a.nTranTotl, 0)) / NULLIF(b.nTranTotl, 0) * 100) AS nTotlDiff" +
+//                            ", ((IFNULL(d.nQuantity, 0) - IFNULL(c.nQuantity, 0)) / NULLIF(d.nQuantity, 0) * 100) AS nQtyxDiff" +
+//                            ", ((IFNULL(d.nUnitPrce, 0) - IFNULL(c.nUnitPrce, 0)) / NULLIF(d.nUnitPrce, 0) * 100) AS nPrceDiff" +
+//                            ", c.sOrderNox" +
+//                            ", b.nTranTotl nPTotlAmt" +
+//                            ", a.nTranTotl nRTotlAmt" +
+//                            ", d.nQuantity nPOQtyxxx" +
+//                            ", c.nQuantity nRcQtyxxx" +
+//                            ", d.nUnitPrce nPUntPrce" +
+//                            ", c.nUnitPrce nRUntPrce" +
+//                      " FROM PO_Receiving_Master a" +
+//                            " RIGHT JOIN PO_Receiving_Detail c ON a.sTransNox = c.sTransNox" +
+//                            " RIGHT JOIN PO_Detail d ON c.sOrderNox = d.sTransNox AND c.sStockIDx = d.sStockIDx " +
+//                            " RIGHT JOIN PO_Master b ON d.sTransNox = b.sTransNox" +
+//                      " WHERE a.sTransNox = " + SQLUtil.toSQL(poMaster.getTransactionNo());
+//        ResultSet loRS = poGRider.executeQuery(lsSQL);
+//        
+//        //set to 100% meaning no purchase order
+//        double lnTotlDiff = 100;
+//        double lnQtyxDiff = 100;
+//        double lnPrceDiff = 100;
+//        
+//        double lnPTotlAmt = 0;
+//        double lnRTotlAmt = 0;
+//        
+//        int lnRecCtrxx = 0;
+//        int lnNullCtrx = 0;
+//        
+//        //Check for the overall difference between the purchase delivery and purchase order...
+//        String lsRemarks;
+//        while(loRS.next()){
+//            //Get the total purchase receiving total amount
+//            if(lnRTotlAmt == 0){
+//                lnRTotlAmt = loRS.getDouble("nRTotlAmt");
+//            }
+//
+//            //Count the number of records and the number of records with no order no
+//            lnRecCtrxx++;
+//            if(loRS.getString("sOrderNox").isEmpty()){
+//                lnNullCtrx++;
+//                continue;
+//            }
+//            
+//            //set the purchase order total, purchase receiving total, and their difference if not yet set
+//            if(lnTotlDiff != 100){
+//                lnTotlDiff = loRS.getDouble("nTotlDiff");
+//                lnPTotlAmt = loRS.getDouble("nPTotlAmt");
+//            }  
+//            
+//            //A difference of positive value means that purchase order quantity is higher than purchase delivery quantity
+//            //A difference of negative value means that purchase order quantity is lower than purchase delivery quantity
+//            //A difference of zero(0) means the quantity is the same...
+//            if(loRS.getDouble("nQtyxDiff") < lnQtyxDiff){
+//                lnQtyxDiff = loRS.getDouble("nQtyxDiff");
+//            }
+//            
+//            //A difference of positive value means that purchase order price is higher than purchase delivery price
+//            //A difference of negative value means that purchase order price is lower than purchase delivery price
+//            //A difference of zero(0) means the price is the same...
+//            if(loRS.getDouble("nPrceDiff") < lnPrceDiff){
+//                lnPrceDiff = loRS.getDouble("nPrceDiff");
+//            }
+//        }
+//
+//        //Is the purchase delivery  without a purchase order or is there an item delivered but not ordered
+//        if(lnRecCtrxx == lnNullCtrx || lnNullCtrx != 0){
+//            lsRemarks = poMaster.getBranchCode()  
+//                + "/" + poMaster.getTransactionNo() 
+//                + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
+//                + ";" + poMaster.getTransactionTotal().toString() 
+//                + ";" + poMaster.getRemarks();
+//            
+//            String lsAuthCode = poMatrix.getAuthType("PURCHASE ORDER MATRIX", String.valueOf(poMaster.getTransactionTotal().toString()), "");
+//            poMatrix.addAuthRequest(lsAuthCode, "", "", lsRemarks);
+//        }
+//        else{
+//            //check if price of delivered items are higher than the purchase order
+//            if(lnPrceDiff < 0){
+//                lsRemarks = poMaster.getBranchCode()
+//                    + "/" + poMaster.getTransactionNo() 
+//                    + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
+//                    + "; Discrepancy in Unit Price: " + String.valueOf(Math.abs(lnPrceDiff)) 
+//                    + ";" + poMaster.getRemarks();
+//
+//                String lsAuthCode = poMatrix.getAuthType("PURCHASE PRICE DISCREPANCY", String.valueOf(Math.abs(lnPrceDiff)), "");
+//                if(!lsAuthCode.isEmpty()){
+//                    poMatrix.addAuthRequest(lsAuthCode, "", "", lsRemarks);
+//                }
+//            }
+//            
+//            //check if quantity of delivered items are higher than the purchase order
+//            if(lnQtyxDiff < 0){
+//                lsRemarks = poMaster.getBranchCode()
+//                    + "/" + poMaster.getTransactionNo() 
+//                    + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
+//                    + "; Discrepancy in Quantity Delivered: " + String.valueOf(Math.abs(lnQtyxDiff)) 
+//                    + ";" + poMaster.getRemarks();
+//
+//                String lsAuthCode = poMatrix.getAuthType("PURCHASE QUANTITY DISCREPANCY", String.valueOf(Math.abs(lnQtyxDiff)), "");
+//                if(!lsAuthCode.isEmpty()){
+//                    poMatrix.addAuthRequest(lsAuthCode, "", "", lsRemarks);
+//                }
+//            }
+//            
+//            //chekc if quantity or price from delivery is higher the purchase order
+//            if(lnPrceDiff < 0 || lnQtyxDiff < 0 ){
+//                String lsAuthCod1 = poMatrix.getAuthType("PURCHASE ORDER MATRIX", String.valueOf(lnRTotlAmt), "");
+//                String lsAuthCod2 = poMatrix.getAuthType("PURCHASE ORDER MATRIX", String.valueOf(lnPTotlAmt), "");
+//
+//                //If authcode of purchase order is different from supposedly authcode of purchase delivery then create authcode
+//                if(!lsAuthCod1.equalsIgnoreCase(lsAuthCod2)){
+//                    lsRemarks = poMaster.getBranchCode()  
+//                        + "/" + poMaster.getTransactionNo() 
+//                        + ";" + SQLUtil.dateFormat(poMaster.getTransactionDate(), "yyyy-MM-dd") 
+//                        + ";" + poMaster.getTransactionTotal().toString() 
+//                        + ";" + poMaster.getRemarks();
+//
+//                    poMatrix.addAuthRequest(lsAuthCod1, "", "", lsRemarks);
+//                }
+//            }
+//        }
+//        
+//        if(poMatrix.hasAuthRequest()){
+//            try {
+//                poJSON = poMatrix.processAuth();
+//            } catch (GuanzonException ex) {
+//                poJSON.put("result", "error");
+//                poJSON.put("message", ex.getMessage());
+//                return poJSON;
+//            }
+//            return poJSON;
+//        }
+//        
         poJSON.put("result", "success");
         return poJSON;
     }

@@ -619,16 +619,16 @@ public class PurchaseOrderReceiving extends Transaction {
             poGRider.rollbackTrans();
             return poJSON;
         }
-        
-        poJSON = confirmAuth(poJSON);
-        if (!"success".equals((String) poJSON.get("result"))) {
-            poJSON = seekApproval();
-            
-            if(!"success".equalsIgnoreCase((String)poJSON.get("result"))){
-                poGRider.rollbackTrans();
-                return poJSON;
-            }
-        }
+        //11-21-2026 - c/o Maam she / maynard
+//        poJSON = confirmAuth(poJSON);
+//        if (!"success".equals((String) poJSON.get("result"))) {
+//            poJSON = seekApproval();
+//            
+//            if(!"success".equalsIgnoreCase((String)poJSON.get("result"))){
+//                poGRider.rollbackTrans();
+//                return poJSON;
+//            }
+//        }
 
         //Set receive qty to Purchase Order / PO Return
         poJSON = setValueToOthers(lsStatus);
